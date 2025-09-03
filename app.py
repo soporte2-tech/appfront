@@ -17,7 +17,7 @@ col_logo1, col_logo2, col_logo3 = st.columns([1, 2, 1])
 with col_logo2:
     # IMPORTANTE: Reemplaza la URL de abajo con la URL directa (raw) de tu logo en GitHub.
     # Para obtenerla, ve a la imagen en tu repositorio de GitHub y haz clic en "Download" o "Raw". Copia esa URL.
-    logo_url = "https://raw.githubusercontent.com/streamlit/streamlit/develop/components/extras/arrow-logo-gh/arrow-logo-gh/assets/logo.png" # <-- REEMPLAZA ESTA URL
+    logo_url = "https://raw.githubusercontent.com/soporte2-tech/appfront/main/imagen.png" # <-- REEMPLAZA ESTA URL
     st.image(logo_url, width=150) # Puedes ajustar el tamaño del logo con el parámetro 'width'
 
     st.title("Asistente Inteligente para Memorias Técnicas")
