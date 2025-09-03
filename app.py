@@ -24,15 +24,21 @@ def go_to_landing():
 def landing_page():
     col1, col_center, col3 = st.columns([1, 2, 1])
     with col_center:
-        st.write(""); st.write(""); st.write("")
+        # --- CAMBIO REALIZADO AQUÍ ---
+        # Hemos eliminado los st.write("") que estaban aquí para subir el contenido.
+        # Dejamos solo uno para que no esté totalmente pegado al borde superior.
+        st.write("")
+
         inner_col1, inner_col2, inner_col3 = st.columns([1, 1, 1])
         with inner_col2:
             logo_url = "https://raw.githubusercontent.com/soporte2-tech/appfront/main/imagen.png"
             st.image(logo_url, width=150)
+        
         st.write("")
         st.markdown("<h1 style='text-align: center;'>Asistente Inteligente para Memorias Técnicas</h1>", unsafe_allow_html=True)
         st.markdown("<h3 style='text-align: center;'>Optimiza y acelera la creación de tus propuestas de licitación</h3>", unsafe_allow_html=True)
         st.write(""); st.write("")
+        
         btn_col1, btn_col2, btn_col3 = st.columns([2, 1.5, 2])
         with btn_col2:
             st.button("¡Vamos allá!", on_click=go_to_phases, type="primary", use_container_width=True)
@@ -80,12 +86,9 @@ def phases_page():
             if st.button("Iniciar Fase 3", type="primary", use_container_width=True):
                 st.info("La Fase 3 estará disponible próximamente.")
     
-    # --- BOTÓN DE VOLVER (MOVIDO Y AJUSTADO AQUÍ) ---
-    # Añadimos un par de espacios en blanco para separarlo de las cajas
+    # --- BOTÓN DE VOLVER ---
     st.write("")
     st.write("")
-
-    # Columnas para centrar el botón de volver
     _, col_back_center, _ = st.columns([2.5, 1, 2.5])
     with col_back_center:
         st.button("← Volver a Inicio", on_click=go_to_landing, use_container_width=True)
