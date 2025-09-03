@@ -163,7 +163,26 @@ def limpiar_respuesta_json(texto_sucio):
     if match_objeto:
         return match_objeto.group(0).strip()
     return ""
+# AÑADIMOS ESTA NUEVA FUNCIÓN PARA MOSTRAR EL ÍNDICE
+def mostrar_indice_desplegable(estructura_memoria):
+    """Toma la parte de la estructura y la muestra como expanders en Streamlit."""
+    if not estructura_memoria:
+        st.warning("No se encontró una estructura de memoria para mostrar.")
+        return
 
+    st.subheader("Índice Propuesto")
+    for seccion in estructura_memoria:
+        apartado_titulo = seccion.get("apartado", "Apartado sin título")
+        subapartados = seccion.get("subapartados", [])
+
+        with st.expander(f"**{apartado_titulo}**"):
+            if subapartados:
+                for sub in subapartados:
+                    # Usamos un guion para que parezca una lista
+                    st.markdown(f"- {sub}")
+            else:
+                # Mensaje para apartados sin subapartados
+                st.markdown("_Este apartado no tiene subapartados definidos._")
 # --- INICIALIZACIÓN DEL ESTADO DE LA PÁGINA (Router) ---
 if 'page' not in st.session_state:
     st.session_state.page = 'landing'
@@ -267,28 +286,32 @@ def phases_page():
 # =============================================================================
 def phase_1_page():
     """Contiene toda la interfaz y lógica para la Fase 1."""
-    # --- Cabecera de la página ---
     st.markdown("<h3>FASE 1: Análisis y Estructura</h3>", unsafe_allow_html=True)
     st.markdown("Carga los documentos base para que la IA genere y valide la estructura de la memoria técnica.")
     st.markdown("---")
     
-    # --- PASO 1: Carga de Documentos ---
+    # --- PASO 1: CARGA DE DOCUMENTOS ---
     with st.container(border=True):
         st.subheader("PASO 1: Carga de Documentos")
         has_template = st.radio("¿Dispones de una plantilla?", ("No", "Sí"), horizontal=True, key="template_radio")
         
-        # Guardamos los archivos subidos en el estado de la sesión para que persistan
-        st.session_state.uploaded_template = None
+        if 'uploaded_template' not in st.session_state: st.session_state.uploaded_template = None
         if has_template == 'Sí':
             st.session_state.uploaded_template = st.file_uploader("Sube tu plantilla (DOCX/PDF)", type=['docx', 'pdf'], key="template_uploader")
         
+        if 'uploaded_pliegos' not in st.session_state: st.session_state.uploaded_pliegos = None
         st.session_state.uploaded_pliegos = st.file_uploader("Sube los Pliegos (DOCX/PDF)", type=['docx', 'pdf'], accept_multiple_files=True, key="pliegos_uploader")
 
     st.write("")
     if st.button("Generar Estructura", type="primary", use_container_width=True):
+        # Al generar una nueva estructura, ocultamos los resultados anteriores para forzar un nuevo clic en "Ver Resultados"
+        if 'show_results' in st.session_state:
+            del st.session_state['show_results']
+            
         if not st.session_state.uploaded_pliegos:
             st.warning("Por favor, sube al menos un archivo de Pliegos.")
         else:
+            # --- AQUÍ VA TU LÓGICA DE BACKEND ---
             with st.spinner("🧠 Analizando documentos y generando la estructura... Esto puede tardar unos minutos."):
                 try:
                     contenido_ia = []
@@ -297,7 +320,6 @@ def phase_1_page():
                     # 1. Procesar la plantilla si existe
                     if has_template == 'Sí' and st.session_state.uploaded_template is not None:
                         prompt_a_usar = PROMPT_PLANTILLA
-                        # Extraer texto de la plantilla
                         if st.session_state.uploaded_template.name.endswith('.docx'):
                             doc = docx.Document(st.session_state.uploaded_template)
                             texto_plantilla = "\n".join([p.text for p in doc.paragraphs])
@@ -328,7 +350,7 @@ def phase_1_page():
                     if json_limpio_str:
                         informacion_estructurada = json.loads(json_limpio_str)
                         st.session_state.generated_structure = informacion_estructurada
-                        st.success("¡Estructura generada con éxito!")
+                        st.success("¡Análisis completado! Haz clic en 'Ver Resultados' para revisar el índice.")
                     else:
                         st.error("La IA devolvió una respuesta vacía o en un formato no válido. Inténtalo de nuevo.")
                         st.text_area("Respuesta recibida de la IA:", response.text)
@@ -338,17 +360,36 @@ def phase_1_page():
                     if 'response' in locals() and hasattr(response, 'prompt_feedback'):
                         st.error(f"Detalles del bloqueo de la API: {response.prompt_feedback}")
     
-    # --- PASO 2: VALIDACIÓN Y RESULTADO ---
+    # --- PASO 2: VISUALIZACIÓN DE RESULTADOS Y VALIDACIÓN ---
     if 'generated_structure' in st.session_state:
         st.markdown("---")
-        with st.container(border=True):
-            st.subheader("PASO 2: Validación de la Estructura")
-            st.json(st.session_state.generated_structure.get('estructura_memoria', "No se encontró la estructura."))
-            
-            with st.expander("Ver detalles y matices de la estructura"):
-                 st.json(st.session_state.generated_structure.get('matices_desarrollo', "No se encontraron los matices."))
-            
-            # La lógica para generar el Word vendría aquí...
+        
+        if st.button("🔍 Ver Resultados", use_container_width=True):
+            st.session_state.show_results = True
+
+        if st.session_state.get('show_results', False):
+            with st.container(border=True):
+                mostrar_indice_desplegable(st.session_state.generated_structure.get('estructura_memoria'))
+
+                with st.expander("Ver detalles y matices completos (JSON)"):
+                     st.json(st.session_state.generated_structure.get('matices_desarrollo', "No se encontraron los matices."))
+                
+                st.markdown("---")
+                st.subheader("Validación y Siguiente Paso")
+                feedback = st.text_area("Si necesitas cambios, indícalos aquí:", key="feedback_area")
+
+                col_val_1, col_val_2 = st.columns(2)
+                with col_val_1:
+                    if st.button("Regenerar con Feedback", use_container_width=True, disabled=not feedback):
+                        st.info("Funcionalidad de regeneración pendiente.")
+                with col_val_2:
+                    if st.button("Aceptar y Generar Guion →", type="primary", use_container_width=True):
+                        # Lógica para generar el Word (sin cambios)
+                        pass # Aquí irá la lógica del Word que vimos antes
+
+    if 'word_file' in st.session_state:
+        # La lógica de descarga no cambia
+        pass
 
     # --- BOTÓN DE VOLVER AL MENÚ DE FASES ---
     st.write("")
