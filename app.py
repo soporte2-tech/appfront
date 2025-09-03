@@ -11,7 +11,7 @@ st.set_page_config(
 if 'page' not in st.session_state:
     st.session_state.page = 'landing'
 
-# --- FUNCIONES DE NAVEGACIÓN ---
+# --- FUNCIONES DE NAVEGÁCIÓN ---
 def go_to_phases():
     st.session_state.page = 'phases'
 
@@ -80,9 +80,10 @@ def phases_page():
             if st.button("Iniciar Fase 3", type="primary", use_container_width=True):
                 st.info("La Fase 3 estará disponible próximamente.")
     
-    # --- BOTÓN DE VOLVER (MOVIDO Y CENTRADO AQUÍ) ---
-    st.write("") # Espacio vertical
-    st.markdown("---") # Línea divisoria
+    # --- BOTÓN DE VOLVER (MOVIDO Y AJUSTADO AQUÍ) ---
+    # Añadimos un par de espacios en blanco para separarlo de las cajas
+    st.write("")
+    st.write("")
 
     # Columnas para centrar el botón de volver
     _, col_back_center, _ = st.columns([2.5, 1, 2.5])
