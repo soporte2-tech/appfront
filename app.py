@@ -371,8 +371,6 @@ def phase_1_page():
             with st.container(border=True):
                 mostrar_indice_desplegable(st.session_state.generated_structure.get('estructura_memoria'))
 
-                with st.expander("Ver detalles y matices completos (JSON)"):
-                     st.json(st.session_state.generated_structure.get('matices_desarrollo', "No se encontraron los matices."))
                 
                 st.markdown("---")
                 st.subheader("Validación y Siguiente Paso")
