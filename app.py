@@ -19,7 +19,6 @@ def go_to_phase1():
 #                              PÁGINA 1: LANDING PAGE
 # =============================================================================
 def landing_page():
-    # ... (el código de tu landing page no cambia)
     col1, col_center, col3 = st.columns([1, 2, 1])
     with col_center:
         st.write("")
@@ -39,9 +38,19 @@ def landing_page():
 #                          PÁGINA 2: SELECCIÓN DE FASES
 # =============================================================================
 def phases_page():
-    # ... (el código de tu página de fases con una pequeña modificación)
+    # --- CABECERA RESTAURADA ---
     logo_url = "https://raw.githubusercontent.com/soporte2-tech/appfront/main/imagen.png"
-    st.markdown(f"""...""", unsafe_allow_html=True) # Mantenemos tu cabecera
+    st.markdown(f"""
+    <div style="display: flex; align-items: center; justify-content: flex-start;">
+        <div style="flex: 1; margin-right: 20px;">
+            <img src="{logo_url}" width="120">
+        </div>
+        <div style="flex: 4;">
+            <h2 style="margin: 0; padding: 0;">Asistente Inteligente para Memorias Técnicas</h2>
+            <p style="margin: 0; padding: 0;">Selecciona una fase para comenzar</p>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
     st.markdown("---")
     
     col1, col2, col3 = st.columns(3, gap="large")
@@ -50,23 +59,22 @@ def phases_page():
             st.markdown("<h4>FASE 1: Análisis y Estructura</h4>", unsafe_allow_html=True)
             st.write("Prepara los documentos base y define el esqueleto de la memoria técnica.")
             st.write("")
-            # CAMBIO: Añadimos on_click=go_to_phase1
             if st.button("Iniciar Fase 1", type="primary", use_container_width=True, key="start_f1"):
                 go_to_phase1()
     with col2:
-        # ... (código de Fase 2 no cambia)
-        st.markdown("<h4>FASE 2: Redacción Asistida</h4>", unsafe_allow_html=True)
-        st.write("Genera los borradores iniciales de contenido para cada apartado.")
-        st.write("")
-        if st.button("Iniciar Fase 2", type="primary", use_container_width=True, key="start_f2"):
-            st.info("La Fase 2 estará disponible próximamente.")
+        with st.container(border=True):
+            st.markdown("<h4>FASE 2: Redacción Asistida</h4>", unsafe_allow_html=True)
+            st.write("Genera los borradores iniciales de contenido para cada apartado.")
+            st.write("")
+            if st.button("Iniciar Fase 2", type="primary", use_container_width=True, key="start_f2"):
+                st.info("La Fase 2 estará disponible próximamente.")
     with col3:
-        # ... (código de Fase 3 no cambia)
-        st.markdown("<h4>FASE 3: Revisión y Exportación</h4>", unsafe_allow_html=True)
-        st.write("Pule el documento final, valida requisitos y expórtalo a Word.")
-        st.write("")
-        if st.button("Iniciar Fase 3", type="primary", use_container_width=True, key="start_f3"):
-            st.info("La Fase 3 estará disponible próximamente.")
+        with st.container(border=True):
+            st.markdown("<h4>FASE 3: Revisión y Exportación</h4>", unsafe_allow_html=True)
+            st.write("Pule el documento final, valida requisitos y expórtalo a Word.")
+            st.write("")
+            if st.button("Iniciar Fase 3", type="primary", use_container_width=True, key="start_f3"):
+                st.info("La Fase 3 estará disponible próximamente.")
 
     st.write(""); st.write("")
     _, col_back_center, _ = st.columns([2.5, 1, 2.5])
@@ -81,17 +89,7 @@ def phase_1_page():
     st.markdown("<h3>FASE 1: Análisis y Estructura</h3>", unsafe_allow_html=True)
     st.markdown("Carga los documentos base para que la IA genere y valide la estructura de la memoria técnica.")
     st.markdown("---")
-
-    # Botón para volver al menú de fases, colocado arriba para fácil acceso
-    if st.button("← Volver al Menú de Fases", key="back_to_menu"):
-        # Limpiamos el estado de la fase 1 al salir
-        for key in ['generated_structure', 'word_file']:
-            if key in st.session_state:
-                del st.session_state[key]
-        go_to_phases()
     
-    st.write("")
-
     # --- PASO 1: CARGA DE DOCUMENTOS ---
     with st.container(border=True):
         st.subheader("PASO 1: Carga de Documentos")
@@ -109,8 +107,6 @@ def phase_1_page():
         else:
             with st.status("Analizando documentos...", expanded=True) as status:
                 st.write("Llamando a la IA para analizar los documentos...")
-                # AQUÍ IRÍA LA LÓGICA DE TU CÓDIGO PARA LLAMAR A GEMINI
-                # Simulamos la respuesta
                 st.session_state.generated_structure = {
                     "estructura_memoria": [{"apartado": "1. Análisis", "subapartados": ["1.1. Contexto", "1.2. DAFO"]}],
                     "matices_desarrollo": [{"apartado": "1. Análisis", "subapartado": "1.1. Contexto", "indicaciones": "Descripción..."}]
@@ -138,8 +134,6 @@ def phase_1_page():
                 if st.button("Aceptar y Generar Guion →", type="primary", use_container_width=True):
                     with st.status("Generando guion estratégico...", expanded=True) as status:
                         st.write("Llamando a la IA para crear las preguntas guía...")
-                        # AQUÍ IRÍA LA LÓGICA PARA CREAR EL WORD
-                        # Simulamos la creación
                         fake_word_file = b"Contenido simulado del documento Word."
                         st.session_state.word_file = fake_word_file
                         status.update(label="¡Guion generado!", state="complete")
@@ -156,6 +150,17 @@ def phase_1_page():
                 mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                 use_container_width=True
             )
+
+    # --- BOTÓN DE VOLVER (MOVIDO Y CENTRADO AQUÍ) ---
+    st.write("")
+    st.markdown("---")
+    _, col_back_center, _ = st.columns([2.5, 1, 2.5])
+    with col_back_center:
+        if st.button("← Volver al Menú de Fases", use_container_width=True, key="back_to_menu"):
+            for key in ['generated_structure', 'word_file']:
+                if key in st.session_state:
+                    del st.session_state[key]
+            go_to_phases()
 
 # --- LÓGICA PRINCIPAL (ROUTER) ---
 if st.session_state.page == 'landing':
