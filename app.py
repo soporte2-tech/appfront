@@ -53,14 +53,14 @@ def phases_page():
     """, unsafe_allow_html=True)
     st.markdown("---")
     
-    col1, col2, col3 = st.columns(3, gap="large")
+   col1, col2, col3 = st.columns(3, gap="large")
     with col1:
         with st.container(border=True):
             st.markdown("<h4>FASE 1: Análisis y Estructura</h4>", unsafe_allow_html=True)
             st.write("Prepara los documentos base y define el esqueleto de la memoria técnica.")
             st.write("")
-            if st.button("Iniciar Fase 1", type="primary", use_container_width=True, key="start_f1"):
-                go_to_phase1()
+            # --- CAMBIO: Usamos on_click en lugar de if ---
+            st.button("Iniciar Fase 1", on_click=go_to_phase1, type="primary", use_container_width=True, key="start_f1")
     with col2:
         with st.container(border=True):
             st.markdown("<h4>FASE 2: Redacción Asistida</h4>", unsafe_allow_html=True)
@@ -79,7 +79,9 @@ def phases_page():
     st.write(""); st.write("")
     _, col_back_center, _ = st.columns([2.5, 1, 2.5])
     with col_back_center:
+        # --- CAMBIO: Usamos on_click en lugar de if ---
         st.button("← Volver a Inicio", on_click=go_to_landing, use_container_width=True)
+
 
 # =============================================================================
 #                           PÁGINA 3: FASE 1
@@ -155,13 +157,10 @@ def phase_1_page():
     st.write("")
     st.markdown("---")
     _, col_back_center, _ = st.columns([2.5, 1, 2.5])
-    with col_back_center:
-        if st.button("← Volver al Menú de Fases", use_container_width=True, key="back_to_menu"):
-            for key in ['generated_structure', 'word_file']:
-                if key in st.session_state:
-                    del st.session_state[key]
-            go_to_phases()
-
+     with col_back_center:
+        # --- CAMBIO: Usamos on_click y la nueva función de callback ---
+        st.button("← Volver al Menú de Fases", on_click=back_to_phases_and_cleanup, use_container_width=True, key="back_to_menu")
+        
 # --- LÓGICA PRINCIPAL (ROUTER) ---
 if st.session_state.page == 'landing':
     landing_page()
