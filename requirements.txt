@@ -1,0 +1,11 @@
+# Core de la App Web
+streamlit
+
+# API de Google Gemini
+google-generativeai
+
+# Para leer archivos .docx
+python-docx
+
+# Para leer archivos .pdf
+pypdf
