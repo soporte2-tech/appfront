@@ -7,20 +7,28 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- NUEVA ESTRUCTURA DE CABECERA ---
-# Creamos dos columnas: una pequeña para el logo y una más grande para el texto.
-# vertical_align="center" asegura que el texto se alinee verticalmente con el logo.
-col_logo, col_text = st.columns([1, 4], vertical_align="center")
+# --- NUEVA CABECERA CON HTML FLEXBOX ---
+# Este método es universal y no depende de la versión de Streamlit
 
-with col_logo:
-    logo_url = "https://raw.githubusercontent.com/soporte2-tech/appfront/main/imagen.png"
-    # Reducimos un poco el tamaño para que encaje mejor en una cabecera
-    st.image(logo_url, width=120)
+logo_url = "https://raw.githubusercontent.com/soporte2-tech/appfront/main/imagen.png"
 
-with col_text:
-    # Ya no necesitamos centrar el texto con HTML, usamos los componentes nativos
-    st.title("Asistente Inteligente para Memorias Técnicas")
-    st.markdown("Optimiza y acelera la creación de tus propuestas de licitación")
+st.markdown(f"""
+<div style="display: flex; align-items: center; justify-content: flex-start;">
+    
+    <!-- Columna del Logo -->
+    <div style="flex: 1; margin-right: 20px;">
+        <img src="{logo_url}" width="120">
+    </div>
+    
+    <!-- Columna del Texto -->
+    <div style="flex: 4;">
+        <h1 style="margin: 0; padding: 0;">Asistente Inteligente para Memorias Técnicas</h1>
+        <p style="margin: 0; padding: 0;">Optimiza y acelera la creación de tus propuestas de licitación</p>
+    </div>
+
+</div>
+""", unsafe_allow_html=True)
+
 
 # Añadimos una línea divisoria para separar claramente la cabecera del contenido
 st.markdown("---")
