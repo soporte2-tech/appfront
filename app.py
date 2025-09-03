@@ -1,7 +1,6 @@
 import streamlit as st
 
 # --- CONFIGURACIÓN DE LA PÁGINA ---
-# Usamos un layout ancho para aprovechar el espacio y le damos un título a la pestaña del navegador.
 st.set_page_config(
     page_title="Asistente de Licitaciones AI",
     layout="wide",
@@ -9,19 +8,18 @@ st.set_page_config(
 )
 
 # --- TÍTULO Y LOGO DE LA EMPRESA ---
-
-# Creamos columnas para centrar el logo y el título en la pantalla
-# El ratio [1, 2, 1] significa que la columna del medio es el doble de ancha que las de los lados.
 col_logo1, col_logo2, col_logo3 = st.columns([1, 2, 1])
 
 with col_logo2:
-    # IMPORTANTE: Reemplaza la URL de abajo con la URL directa (raw) de tu logo en GitHub.
-    # Para obtenerla, ve a la imagen en tu repositorio de GitHub y haz clic en "Download" o "Raw". Copia esa URL.
-    logo_url = "https://raw.githubusercontent.com/soporte2-tech/appfront/main/imagen.png" # <-- REEMPLAZA ESTA URL
-    st.image(logo_url, width=150) # Puedes ajustar el tamaño del logo con el parámetro 'width'
+    # Creamos columnas DENTRO de la columna central para centrar la imagen
+    inner_col1, inner_col2, inner_col3 = st.columns([1, 1, 1])
+    with inner_col2:
+        logo_url = "https://raw.githubusercontent.com/soporte2-tech/appfront/main/imagen.png"
+        st.image(logo_url, width=150)
 
-    st.title("Asistente Inteligente para Memorias Técnicas")
-    st.markdown("### Optimiza y acelera la creación de tus propuestas de licitación")
+    # Centramos el texto usando st.markdown con estilo CSS
+    st.markdown("<h1 style='text-align: center;'>Asistente Inteligente para Memorias Técnicas</h1>", unsafe_allow_html=True)
+    st.markdown("<h3 style='text-align: center;'>Optimiza y acelera la creación de tus propuestas de licitación</h3>", unsafe_allow_html=True)
 
 
 st.markdown("---") # Una línea divisoria para separar secciones
