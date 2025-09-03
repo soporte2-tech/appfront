@@ -1,6 +1,6 @@
 import streamlit as st
 
-# --- CONFIGURACIÓN DE LA PÁGINA ---
+# --- CONFIGURACIÓN DE LA PÁJINA ---
 st.set_page_config(
     page_title="Asistente de Licitaciones AI",
     layout="wide",
@@ -22,12 +22,17 @@ with col_logo2:
     st.markdown("<h3 style='text-align: center;'>Optimiza y acelera la creación de tus propuestas de licitación</h3>", unsafe_allow_html=True)
 
 
-st.markdown("---") # Una línea divisoria para separar secciones
+# ---- CAMBIOS REALIZADOS AQUÍ ----
+# Hemos eliminado las siguientes líneas para hacer el diseño más compacto:
+# st.markdown("---")
+# st.header("Selecciona una fase para comenzar")
+# st.write("")
+# ---------------------------------
+
+# Un pequeño espacio para que no quede totalmente pegado
+st.write("") 
 
 # --- SELECCIÓN DE FASES ---
-
-st.header("Selecciona una fase para comenzar")
-st.write("") # Un poco de espacio vertical
 
 # Creamos tres columnas para los "cuadrados interactivos"
 col1, col2, col3 = st.columns(3, gap="large")
@@ -45,9 +50,7 @@ with col1:
         """)
         st.write("") # Espacio
         if st.button("Iniciar Fase 1", type="primary", use_container_width=True):
-            # Aquí irá la lógica para ejecutar la Fase 1 en el futuro
             st.success("Navegando a la Fase 1...")
-            # st.switch_page("pages/fase1.py") # Ejemplo de cómo podrías navegar a otra página
 
 # --- FASE 2: Redacción Asistida (Corresponde a tu FASE 1 y 2 del código) ---
 with col2:
@@ -62,7 +65,6 @@ with col2:
         """)
         st.write("") # Espacio
         if st.button("Iniciar Fase 2", type="primary", use_container_width=True):
-            # Aquí irá la lógica para ejecutar la Fase 2 en el futuro
             st.info("La Fase 2 estará disponible próximamente.")
 
 # --- FASE 3: Revisión y Exportación (Corresponde a tu FASE 3 del código) ---
@@ -78,5 +80,4 @@ with col3:
         """)
         st.write("") # Espacio
         if st.button("Iniciar Fase 3", type="primary", use_container_width=True):
-            # Aquí irá la lógica para ejecutar la Fase 3 en el futuro
             st.info("La Fase 3 estará disponible próximamente.")
