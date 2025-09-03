@@ -15,7 +15,6 @@ if 'page' not in st.session_state:
 def go_to_phases():
     st.session_state.page = 'phases'
 
-# AÑADIMOS ESTA NUEVA FUNCIÓN PARA VOLVER ATRÁS
 def go_to_landing():
     st.session_state.page = 'landing'
 
@@ -42,7 +41,7 @@ def landing_page():
 #                          PÁGINA 2: SELECCIÓN DE FASES
 # =============================================================================
 def phases_page():
-    # --- CABECERA CON HTML FLEXBOX (VERSIÓN COMPATIBLE) ---
+    # --- CABECERA ---
     logo_url = "https://raw.githubusercontent.com/soporte2-tech/appfront/main/imagen.png"
     st.markdown(f"""
     <div style="display: flex; align-items: center; justify-content: flex-start;">
@@ -55,14 +54,9 @@ def phases_page():
         </div>
     </div>
     """, unsafe_allow_html=True)
-    
     st.markdown("---")
 
-    # AÑADIMOS EL BOTÓN DE VOLVER AQUÍ
-    st.button("← Volver a Inicio", on_click=go_to_landing, key="back_button")
-    st.write("") # Un pequeño espacio
-
-    # Las tres cajas de las fases
+    # --- Las tres cajas de las fases ---
     col1, col2, col3 = st.columns(3, gap="large")
     with col1:
         with st.container(border=True):
@@ -85,6 +79,15 @@ def phases_page():
             st.write("")
             if st.button("Iniciar Fase 3", type="primary", use_container_width=True):
                 st.info("La Fase 3 estará disponible próximamente.")
+    
+    # --- BOTÓN DE VOLVER (MOVIDO Y CENTRADO AQUÍ) ---
+    st.write("") # Espacio vertical
+    st.markdown("---") # Línea divisoria
+
+    # Columnas para centrar el botón de volver
+    _, col_back_center, _ = st.columns([2.5, 1, 2.5])
+    with col_back_center:
+        st.button("← Volver a Inicio", on_click=go_to_landing, use_container_width=True)
 
 # --- LÓGICA PRINCIPAL (ROUTER) ---
 if st.session_state.page == 'landing':
