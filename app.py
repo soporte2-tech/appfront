@@ -336,7 +336,6 @@ def phase_1_page():
     st.markdown("Carga los documentos base para que la IA genere y valide la estructura de la memoria técnica.")
     st.markdown("---")
     
-    # --- PASO 1: CARGA DE DOCUMENTOS ---
     with st.container(border=True):
         st.subheader("PASO 1: Carga de Documentos")
         has_template = st.radio("¿Dispones de una plantilla?", ("No", "Sí"), horizontal=True, key="template_radio")
@@ -355,7 +354,6 @@ def phase_1_page():
         else:
             with st.spinner("🧠 Analizando documentos y generando la estructura..."):
                 try:
-                    # --- Tu lógica de backend para llamar a la IA (sin cambios) ---
                     contenido_ia = []
                     texto_plantilla = ""
                     if has_template == 'Sí' and st.session_state.uploaded_template is not None:
@@ -381,24 +379,32 @@ def phase_1_page():
                     
                     json_limpio_str = limpiar_respuesta_json(response.text)
                     if json_limpio_str:
-                        informacion_estructurada = json.loads(json_limpio_str)
-                        st.session_state.generated_structure = informacion_estructurada
-                        # --- CAMBIO CLAVE: NAVEGACIÓN AUTOMÁTICA ---
-                        go_to_phase1_results()
-                        st.rerun() # Forza a Streamlit a recargar el script y mostrar la nueva página
+                        # --- CORRECCIÓN: AÑADIMOS TRY...EXCEPT AQUÍ ---
+                        try:
+                            informacion_estructurada = json.loads(json_limpio_str)
+                            st.session_state.generated_structure = informacion_estructurada
+                            # Si todo va bien, navegamos a la página de resultados
+                            go_to_phase1_results()
+                            st.rerun()
+                        except json.JSONDecodeError as json_error:
+                            # Si el JSON está mal formado, mostramos el error
+                            st.error("Error de formato en la respuesta de la IA. La estructura recibida no es un JSON válido.")
+                            st.error(f"Detalle técnico: {json_error}")
+                            st.text_area("Texto JSON con errores recibido de la IA:", json_limpio_str, height=300)
                     else:
-                        st.error("La IA devolvió una respuesta vacía o en un formato no válido.")
+                        st.error("La IA devolvió una respuesta vacía o en un formato no válido después de la limpieza.")
+                        st.text_area("Respuesta original recibida de la IA:", response.text, height=200)
 
                 except Exception as e:
-                    st.error(f"Ocurrió un error al contactar con la IA: {e}")
+                    st.error(f"Ocurrió un error general al contactar con la IA: {e}")
+                    if 'response' in locals() and hasattr(response, 'prompt_feedback'):
+                        st.error(f"Detalles del bloqueo de la API: {response.prompt_feedback}")
 
-    # --- BOTÓN DE VOLVER AL MENÚ DE FASES ---
     st.write("")
     st.markdown("---")
     _, col_back_center, _ = st.columns([2.5, 1, 2.5])
     with col_back_center:
         st.button("← Volver al Menú de Fases", on_click=back_to_phases_and_cleanup, use_container_width=True, key="back_to_menu")
-
 # =============================================================================
 #                       PÁGINA 4: RESULTADOS FASE 1
 # =============================================================================
