@@ -4,6 +4,7 @@ import json
 import re
 import docx
 from pypdf import PdfReader
+import io
 
 # --- CONFIGURACIÓN DE LA PÁGINA ---
 st.set_page_config(page_title="Asistente de Licitaciones AI", layout="wide", initial_sidebar_state="collapsed")
