@@ -148,60 +148,104 @@ que va a redactar la memoria técnica sepa todo lo necesario para poder redactar
 }
 """
 
+PROMPT_PREGUNTAS_TECNICAS = """
+Actúa como un planificador de licitación. Te quieres presentar a una licitación y debes crear un documento enfocando el contenido que aparecerá en este para que tus compañeros vean tu propuesta
+y la validen y complementen. Tu objetivo será crear una propuesta de contenido ganadora basándote en lo que se pide en los pliegos para que tus compañeros sólo den el ok
+y se pueda mandar el contenido a un redactor para que simplemente profundice en lo que tu has planteado. Esa "mini memoria técnica" será la que se le dará a un compañaero que se dedica a redactar.
+
+La estructura del documento será un indice pegando la estructrua simplemente que tendrá esa memoria técnica ("Estructura de la memoria técnica") y la propuesta de los apartados ("Propuesta de contenido para Nombre Licitación").
+En la propuesta de contenido por apartado debes responder a dos preguntas: qué se debe incluir en este apartado y el contenido propuesto para ese apartado.
+La primera pregunta debe ser un resumen de todo lo que se pide en el pliego para ese apartado. Debes detallar qué aspectos se valoran básandote en lo que se dice en el pliego administrativo, qué información se detallará en profundida en esa parte exclusivamente , cuales son los puntos generales que tocarás en este apartado, qué aspectos se valoran básandote en lo que se dice en el pliego técnico y las puntuaciones relativas a este apartado. Esto debe estar en párrafos y en bullet points.
+La segunda pregunta debe ser tu propuesta de contenido para responder ese apartado. Esa propuesta debe enfocarse a explicar la propuesta que tu crees más óptima para obtener la mayor puntuación. Debes detallarla ampliamente de una manera esquemática enfocando en el contenido (no en la explicación) de eso que propones. Esa propuesta será analizada por tus compañeros para mejorar el enfoque.
+Para responder a esa segunda pregunta, deberás crear preguntas que desengranen el contenido general de ese apartado en preguntas más pequeñas para que tus compañeros puedan ir ajustando y mejorando cada fase.
+Por ejemplo, si se te habla de metodología: primero deberás leerte el pliego administrativo y ver que estructura debe tener una metodología y segundo leerte el pliego técnico y ver el contenido que debe tener. En ese caso localizaste (ampliando lo que se dice en los pliegios) que la metodología debe hablar sobre los principios que enmarcan esa propuesta, la teoría de la metodología, las actividades y el cronograma.
+Con esos puntos localizados deberías escribir un párrafo amplio profundizando en esa primera pregunta de resumen de todo lo que se pide en el pliego para ese apartado y después escribir la desengranción de preguntas por apartado y dar una respuesta detallada sobre el contenido o el enfoque que deberá tener ese contenido para definir perfectamente la metodología final de esa memoria técnica.
+Debe ser propuestas muy precisas, es decir, deben de ser textos que expliquen muy bien todas las actividades, metodologías y conceptos relacionados con el enfoque de una manera que la persona que lea este documento solo se dedique a matizar y a mejorar los contenidos.
+
+Para cada apartado y subapartado del índice, desarrollarás el contenido siguiendo OBLIGATORIAMENTE estas 6 REGLAS DE ORO:
+
+    1.  **TONO PROFESIONAL E IMPERSONAL:** Redacta siempre en tercera persona. Elimina CUALQUIER referencia personal (ej. "nosotros", "nuestra propuesta"). Usa formulaciones como "El servicio se articula en...", "La metodología implementada será...".
+
+    2.  **CONCRECIÓN ABSOLUTA (EL "CÓMO"):** Cada afirmación general DEBE ser respaldada por una acción concreta, una herramienta específica (ej. CRM HubSpot for Startups, WhatsApp Business API), una métrica medible o un entregable tangible. Evita las frases vacías.
+
+    3.  **ENFOQUE EN EL USUARIO FINAL (BUYER PERSONA):** Orienta todo el contenido a resolver los problemas del buyer persona objetivo de esa licitación. Demuestra un profundo conocimiento de su perfil, retos (burocracia, aislamiento) y objetivos (viabilidad, crecimiento).
+
+    4.  **LONGITUD CONTROLADA POR PALABRAS:** El desarrollo completo de la "Propuesta de Contenido" debe tener una extensión total de entre 6.000 y 8.000 palabras. Distribuye el contenido de forma equilibrada entre los apartados para alcanzar este objetivo sin generar texto de relleno.
+
+    5.  **PROPUESTA DE VALOR ESTRATÉGICA:** Enfócate en los resultados y el valor añadido. En esta memoria no busques adornar las ideas, centrate en mostrar las ideas de una manera fácil de ver y clara.
+
+    6.  **ALINEACIÓN TOTAL CON EL PLIEGO (PPT):** La justificación de cada acción debe ser su alineación con los requisitos del Pliego y el valor que aporta para obtener la máxima puntuación.
+
+    Para el desarrollo de cada apartado en la PARTE 2, usa este formato:
+    -   **"Qué se debe incluir en este apartado (Análisis del Pliego)":** Resume los requisitos del PPT, criterios de evaluación y puntuación.
+    -   **"Contenido Propuesto para el Apartado":** Aplica aquí las 6 Reglas de Oro, desarrollando la propuesta de forma concreta, estratégica y detallada.
+
+En este documento solo deberán aparecer los apartados angulares de la propuesta. Se omitirán los de presentación, los de introducción y los que no vayan directamente asociados a definir lo principal de la licitación. Normalmente lo prinicipal es la metodología, las actividades que se van a hacer y la planificación con su cronograma correspondiente.
+
+Te proporcionaré DOS elementos clave:
+1.  El texto completo de los documentos base (Pliegos y/o plantilla).
+2.  La estructura que se ha generado en el mensaje anterior con los apartados y las anotaciones.
+"""
 
 # --- FUNCIONES AUXILIARES DE BACKEND ---
 def limpiar_respuesta_json(texto_sucio):
-    """Limpia la respuesta de la IA para extraer un objeto JSON de forma robusta."""
-    if not isinstance(texto_sucio, str):
-        return ""
-    # Prioriza la búsqueda de un bloque de código JSON
+    if not isinstance(texto_sucio, str): return ""
     match_bloque = re.search(r'```(?:json)?\s*(\{.*\})\s*```', texto_sucio, re.DOTALL)
-    if match_bloque:
-        return match_bloque.group(1).strip()
-    # Si no lo encuentra, busca el primer objeto JSON que vea
+    if match_bloque: return match_bloque.group(1).strip()
     match_objeto = re.search(r'\{.*\}', texto_sucio, re.DOTALL)
-    if match_objeto:
-        return match_objeto.group(0).strip()
+    if match_objeto: return match_objeto.group(0).strip()
     return ""
-# AÑADIMOS ESTA NUEVA FUNCIÓN PARA MOSTRAR EL ÍNDICE
+
+def agregar_markdown_a_word(documento, texto_markdown):
+    patron_encabezado = re.compile(r'^(#+)\s+(.*)')
+    patron_lista_numerada = re.compile(r'^\s*\d+\.\s+')
+    patron_lista_viñeta = re.compile(r'^\s*[\*\-]\s+')
+    def procesar_linea_con_negritas(parrafo, texto):
+        partes = re.split(r'(\*\*.*?\*\*)', texto)
+        for parte in partes:
+            if parte.startswith('**') and parte.endswith('**'): parrafo.add_run(parte[2:-2]).bold = True
+            elif parte: parrafo.add_run(parte)
+    for linea in texto_markdown.split('\n'):
+        linea_limpia = linea.strip()
+        if not linea_limpia: continue
+        match_encabezado = patron_encabezado.match(linea_limpia)
+        if match_encabezado:
+            documento.add_heading(match_encabezado.group(2).strip(), level=min(len(match_encabezado.group(1)), 4))
+            continue
+        if patron_lista_numerada.match(linea_limpia):
+            p = documento.add_paragraph(style='List Number')
+            procesar_linea_con_negritas(p, patron_lista_numerada.sub('', linea_limpia))
+        elif patron_lista_viñeta.match(linea_limpia):
+            p = documento.add_paragraph(style='List Bullet')
+            procesar_linea_con_negritas(p, patron_lista_viñeta.sub('', linea_limpia))
+        else:
+            p = documento.add_paragraph()
+            procesar_linea_con_negritas(p, linea_limpia)
+
 def mostrar_indice_desplegable(estructura_memoria):
-    """Toma la parte de la estructura y la muestra como expanders en Streamlit."""
     if not estructura_memoria:
         st.warning("No se encontró una estructura de memoria para mostrar.")
         return
-
     st.subheader("Índice Propuesto")
     for seccion in estructura_memoria:
         apartado_titulo = seccion.get("apartado", "Apartado sin título")
         subapartados = seccion.get("subapartados", [])
-
         with st.expander(f"**{apartado_titulo}**"):
             if subapartados:
-                for sub in subapartados:
-                    # Usamos un guion para que parezca una lista
-                    st.markdown(f"- {sub}")
-            else:
-                # Mensaje para apartados sin subapartados
-                st.markdown("_Este apartado no tiene subapartados definidos._")
-# --- INICIALIZACIÓN DEL ESTADO DE LA PÁGINA (Router) ---
-if 'page' not in st.session_state:
-    st.session_state.page = 'landing'
+                for sub in subapartados: st.markdown(f"- {sub}")
+            else: st.markdown("_Este apartado no tiene subapartados definidos._")
 
-# --- FUNCIONES DE NAVEGACIÓN ---
-def go_to_phases():
-    st.session_state.page = 'phases'
-def go_to_landing():
-    st.session_state.page = 'landing'
-def go_to_phase1():
-    st.session_state.page = 'phase_1'
-def go_to_phase1_results():
-    st.session_state.page = 'phase_1_results'
+# --- NAVEGACIÓN Y GESTIÓN DE ESTADO ---
+if 'page' not in st.session_state: st.session_state.page = 'landing'
+
+def go_to_phases(): st.session_state.page = 'phases'
+def go_to_landing(): st.session_state.page = 'landing'
+def go_to_phase1(): st.session_state.page = 'phase_1'
+def go_to_phase1_results(): st.session_state.page = 'phase_1_results'
 
 def back_to_phases_and_cleanup():
-    """Limpia las variables de la sesión de la Fase 1 antes de volver."""
     for key in ['generated_structure', 'word_file', 'uploaded_template', 'uploaded_pliegos']:
-        if key in st.session_state:
-            del st.session_state[key]
+        if key in st.session_state: del st.session_state[key]
     go_to_phases()
 
 
@@ -359,55 +403,57 @@ def phase_1_page():
 #                       PÁGINA 4: RESULTADOS FASE 1
 # =============================================================================
 def phase_1_results_page():
-    """Muestra el índice generado y las opciones de validación."""
     st.markdown("<h3>FASE 1: Revisión de Resultados</h3>", unsafe_allow_html=True)
     st.markdown("Revisa el índice propuesto por la IA. Si es correcto, genera el guion estratégico.")
     st.markdown("---")
-
-    # Botón para volver a la página de carga de archivos
     st.button("← Volver a Cargar Archivos", on_click=go_to_phase1)
 
-    # Contenedor con los resultados
     with st.container(border=True):
         mostrar_indice_desplegable(st.session_state.generated_structure.get('estructura_memoria'))
-        
         st.markdown("---")
         st.subheader("Validación y Siguiente Paso")
         feedback = st.text_area("Si necesitas cambios, indícalos aquí:", key="feedback_area")
-
         col_val_1, col_val_2 = st.columns(2)
         with col_val_1:
             if st.button("Regenerar con Feedback", use_container_width=True, disabled=not feedback):
                 st.info("Funcionalidad de regeneración pendiente.")
         with col_val_2:
             if st.button("Aceptar y Generar Guion →", type="primary", use_container_width=True):
-                # Lógica para generar el Word (sin cambios)
-                with st.spinner("✍️ Creando el documento Word con las preguntas guía..."):
-                    # ... Tu lógica para llamar a la IA con PROMPT_PREGUNTAS_TECNICAS ...
-                    st.session_state.word_file = b"Contenido simulado del Word"
-                st.success("¡Documento Word generado!")
+                with st.spinner("✍️ Creando el guion estratégico... Este proceso puede tardar varios minutos."):
+                    try:
+                        contenido_ia_preguntas = [PROMPT_PREGUNTAS_TECNICAS]
+                        contenido_ia_preguntas.append("--- ESTRUCTURA VALIDADA (JSON) ---\n" + json.dumps(st.session_state.generated_structure, indent=2))
+                        for pliego in st.session_state.uploaded_pliegos:
+                            contenido_ia_preguntas.append({"mime_type": pliego.type, "data": pliego.getvalue()})
+                        if st.session_state.get('uploaded_template'):
+                            contenido_ia_preguntas.append({"mime_type": st.session_state.uploaded_template.type, "data": st.session_state.uploaded_template.getvalue()})
 
-    # Mostrar el botón de descarga si el archivo Word ya está listo
+                        response_preguntas = model.generate_content(contenido_ia_preguntas)
+                        
+                        documento = docx.Document()
+                        documento.add_heading("Guion Estratégico de Enfoque", level=0)
+                        agregar_markdown_a_word(documento, response_preguntas.text)
+                        
+                        doc_io = io.BytesIO()
+                        documento.save(doc_io)
+                        doc_io.seek(0)
+                        st.session_state.word_file = doc_io.getvalue()
+                        
+                        st.success("¡Documento Word generado! Ya puedes descargarlo a continuación.")
+                    except Exception as e:
+                        st.error(f"Ocurrió un error al generar el guion: {e}")
+                        if 'response_preguntas' in locals() and hasattr(response_preguntas, 'prompt_feedback'): st.error(f"Detalles del bloqueo: {response_preguntas.prompt_feedback}")
+
     if 'word_file' in st.session_state:
         st.markdown("---")
         with st.container(border=True):
-            st.subheader("Descarga del Resultado")
-            st.download_button(
-                label="📥 Descargar Guion Estratégico (.docx)",
-                data=st.session_state.word_file,
-                file_name="guion_estrategico.docx",
-                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                use_container_width=True
-            )
+            st.subheader("Descarga del Resultado Final")
+            st.download_button(label="📥 Descargar Guion Estratégico (.docx)", data=st.session_state.word_file, file_name="guion_estrategico.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document", use_container_width=True)
+
 # =============================================================================
 #                        LÓGICA PRINCIPAL (ROUTER)
 # =============================================================================
-# Este bloque final decide qué función de página ejecutar basado en el estado.
-if st.session_state.page == 'landing':
-    landing_page()
-elif st.session_state.page == 'phases':
-    phases_page()
-elif st.session_state.page == 'phase_1':
-    phase_1_page()
-elif st.session_state.page == 'phase_1_results':
-    phase_1_results_page()
+if st.session_state.page == 'landing': landing_page()
+elif st.session_state.page == 'phases': phases_page()
+elif st.session_state.page == 'phase_1': phase_1_page()
+elif st.session_state.page == 'phase_1_results': phase_1_results_page()
