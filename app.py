@@ -28,12 +28,12 @@ def landing_page():
         inner_col1, inner_col2, inner_col3 = st.columns([1, 1, 1])
         with inner_col2:
             logo_url = "https://raw.githubusercontent.com/soporte2-tech/appfront/main/imagen.png"
-            # --- CAMBIO: Usamos <img> en markdown para quitar el icono de zoom ---
             st.markdown(f'<div style="text-align: center;"><img src="{logo_url}" width="150"></div>', unsafe_allow_html=True)
         
         st.write("")
-        st.markdown("<h1 style='text-align: center;'>Asistente Inteligente para Memorias Técnicas</h1>", unsafe_allow_html=True)
-        st.markdown("<h3 style='text-align: center;'>Optimiza y acelera la creación de tus propuestas de licitación</h3>", unsafe_allow_html=True)
+        # --- CAMBIO: Envolvemos los títulos en <div> para eliminar el enlace ---
+        st.markdown("<div style='text-align: center;'><h1>Asistente Inteligente para Memorias Técnicas</h1></div>", unsafe_allow_html=True)
+        st.markdown("<div style='text-align: center;'><h3>Optimiza y acelera la creación de tus propuestas de licitación</h3></div>", unsafe_allow_html=True)
         st.write(""); st.write("")
         
         btn_col1, btn_col2, btn_col3 = st.columns([2, 1.5, 2])
@@ -46,7 +46,6 @@ def landing_page():
 def phases_page():
     # --- CABECERA ---
     logo_url = "https://raw.githubusercontent.com/soporte2-tech/appfront/main/imagen.png"
-    # Este bloque ya usa <img> y <h2>, por lo que está libre de iconos no deseados.
     st.markdown(f"""
     <div style="display: flex; align-items: center; justify-content: flex-start;">
         <div style="flex: 1; margin-right: 20px;">
@@ -64,21 +63,24 @@ def phases_page():
     col1, col2, col3 = st.columns(3, gap="large")
     with col1:
         with st.container(border=True):
-            st.subheader("FASE 1: Análisis y Estructura")
+            # --- CAMBIO: Usamos markdown con <h4> para quitar el enlace ---
+            st.markdown("<h4>FASE 1: Análisis y Estructura</h4>", unsafe_allow_html=True)
             st.write("Prepara los documentos base y define el esqueleto de la memoria técnica.")
             st.write("")
             if st.button("Iniciar Fase 1", type="primary", use_container_width=True):
                 st.success("Cargando Fase 1...")
     with col2:
         with st.container(border=True):
-            st.subheader("FASE 2: Redacción Asistida")
+            # --- CAMBIO: Usamos markdown con <h4> para quitar el enlace ---
+            st.markdown("<h4>FASE 2: Redacción Asistida</h4>", unsafe_allow_html=True)
             st.write("Genera los borradores iniciales de contenido para cada apartado.")
             st.write("")
             if st.button("Iniciar Fase 2", type="primary", use_container_width=True):
                 st.info("La Fase 2 estará disponible próximamente.")
     with col3:
         with st.container(border=True):
-            st.subheader("FASE 3: Revisión y Exportación")
+            # --- CAMBIO: Usamos markdown con <h4> para quitar el enlace ---
+            st.markdown("<h4>FASE 3: Revisión y Exportación</h4>", unsafe_allow_html=True)
             st.write("Pule el documento final, valida requisitos y expórtalo a Word.")
             st.write("")
             if st.button("Iniciar Fase 3", type="primary", use_container_width=True):
