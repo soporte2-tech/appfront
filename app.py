@@ -54,16 +54,24 @@ def landing_page():
 #                          PÁGINA 2: SELECCIÓN DE FASES
 # =============================================================================
 def phases_page():
-    # Cabecera con logo y texto (el diseño que ya te gustó)
-    col_logo, col_text = st.columns([1, 4], vertical_align="center")
-    with col_logo:
-        logo_url = "https://raw.githubusercontent.com/soporte2-tech/appfront/main/imagen.png"
-        st.image(logo_url, width=120)
-    with col_text:
-        st.title("Asistente Inteligente para Memorias Técnicas")
-        st.markdown("Selecciona una fase para comenzar")
+    # --- NUEVA CABECERA CON HTML FLEXBOX (COMPATIBLE CON TODAS LAS VERSIONES) ---
+    logo_url = "https://raw.githubusercontent.com/soporte2-tech/appfront/main/imagen.png"
+    st.markdown(f"""
+    <div style="display: flex; align-items: center; justify-content: flex-start;">
+        <div style="flex: 1; margin-right: 20px;">
+            <img src="{logo_url}" width="120">
+        </div>
+        <div style="flex: 4;">
+            <h2 style="margin: 0; padding: 0;">Asistente Inteligente para Memorias Técnicas</h2>
+            <p style="margin: 0; padding: 0;">Selecciona una fase para comenzar</p>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
     
     st.markdown("---")
+
+    # Las tres cajas de las fases (esto no cambia)
+    col1, col2, col3 = st.columns(3, gap="large")
 
     # Las tres cajas de las fases
     col1, col2, col3 = st.columns(3, gap="large")
