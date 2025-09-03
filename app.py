@@ -11,10 +11,12 @@ st.set_page_config(page_title="Asistente de Licitaciones AI", layout="wide", ini
 # --- CONFIGURACIÓN DE LA API KEY Y MODELO DE IA ---
 # Streamlit buscará el secret 'GEMINI_API_KEY' que has configurado.
 try:
-    api_key = st.secrets["AIzaSyCrIOVdXzI75VqabdV-tT7t27qtZmGWj1A"]
+    # --- CORRECCIÓN AQUÍ ---
+    # Usamos el NOMBRE del secret (la clave), no el valor.
+    api_key = st.secrets["GEMINI_API_KEY"]
     genai.configure(api_key=api_key)
     # Usamos un modelo potente y rápido para esta tarea
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    model = genai.GenerativeModel('gemini-2.5-flash')
 except Exception as e:
     # Mostramos un error amigable si la API Key no está configurada
     st.error(f"Error al configurar la API de Gemini. Asegúrate de que el secret 'GEMINI_API_KEY' esté bien configurado en 'Manage app'. Error: {e}")
