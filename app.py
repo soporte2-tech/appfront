@@ -194,10 +194,12 @@ def go_to_landing():
     st.session_state.page = 'landing'
 def go_to_phase1():
     st.session_state.page = 'phase_1'
+def go_to_phase1_results():
+    st.session_state.page = 'phase_1_results'
 
 def back_to_phases_and_cleanup():
     """Limpia las variables de la sesión de la Fase 1 antes de volver."""
-    for key in ['generated_structure', 'word_file']:
+    for key in ['generated_structure', 'word_file', 'uploaded_template', 'uploaded_pliegos']:
         if key in st.session_state:
             del st.session_state[key]
     go_to_phases()
@@ -282,10 +284,10 @@ def phases_page():
         st.button("← Volver a Inicio", on_click=go_to_landing, use_container_width=True)
 
 # =============================================================================
-#                           PÁGINA 3: FASE 1
+#                           PÁGINA 3: FASE 1 (CARGA)
 # =============================================================================
 def phase_1_page():
-    """Contiene toda la interfaz y lógica para la Fase 1."""
+    """Página para la carga de documentos de la Fase 1."""
     st.markdown("<h3>FASE 1: Análisis y Estructura</h3>", unsafe_allow_html=True)
     st.markdown("Carga los documentos base para que la IA genere y valide la estructura de la memoria técnica.")
     st.markdown("---")
@@ -304,20 +306,14 @@ def phase_1_page():
 
     st.write("")
     if st.button("Generar Estructura", type="primary", use_container_width=True):
-        # Al generar una nueva estructura, ocultamos los resultados anteriores para forzar un nuevo clic en "Ver Resultados"
-        if 'show_results' in st.session_state:
-            del st.session_state['show_results']
-            
         if not st.session_state.uploaded_pliegos:
             st.warning("Por favor, sube al menos un archivo de Pliegos.")
         else:
-            # --- AQUÍ VA TU LÓGICA DE BACKEND ---
-            with st.spinner("🧠 Analizando documentos y generando la estructura... Esto puede tardar unos minutos."):
+            with st.spinner("🧠 Analizando documentos y generando la estructura..."):
                 try:
+                    # --- Tu lógica de backend para llamar a la IA (sin cambios) ---
                     contenido_ia = []
                     texto_plantilla = ""
-
-                    # 1. Procesar la plantilla si existe
                     if has_template == 'Sí' and st.session_state.uploaded_template is not None:
                         prompt_a_usar = PROMPT_PLANTILLA
                         if st.session_state.uploaded_template.name.endswith('.docx'):
@@ -329,65 +325,28 @@ def phase_1_page():
                     else:
                         prompt_a_usar = PROMPT_PLIEGOS
 
-                    # 2. Construir el contenido para la IA
                     contenido_ia.append(prompt_a_usar)
                     if texto_plantilla:
                         contenido_ia.append(texto_plantilla)
                     
-                    # 3. Procesar los pliegos
                     for pliego in st.session_state.uploaded_pliegos:
-                        contenido_ia.append({
-                            "mime_type": pliego.type,
-                            "data": pliego.getvalue()
-                        })
+                        contenido_ia.append({"mime_type": pliego.type, "data": pliego.getvalue()})
 
-                    # 4. Llamar a la API de Gemini
                     generation_config = genai.GenerationConfig(response_mime_type="application/json")
                     response = model.generate_content(contenido_ia, generation_config=generation_config)
                     
-                    # 5. Procesar la respuesta
                     json_limpio_str = limpiar_respuesta_json(response.text)
                     if json_limpio_str:
                         informacion_estructurada = json.loads(json_limpio_str)
                         st.session_state.generated_structure = informacion_estructurada
-                        st.success("¡Análisis completado! Haz clic en 'Ver Resultados' para revisar el índice.")
+                        # --- CAMBIO CLAVE: NAVEGACIÓN AUTOMÁTICA ---
+                        go_to_phase1_results()
+                        st.rerun() # Forza a Streamlit a recargar el script y mostrar la nueva página
                     else:
-                        st.error("La IA devolvió una respuesta vacía o en un formato no válido. Inténtalo de nuevo.")
-                        st.text_area("Respuesta recibida de la IA:", response.text)
+                        st.error("La IA devolvió una respuesta vacía o en un formato no válido.")
 
                 except Exception as e:
                     st.error(f"Ocurrió un error al contactar con la IA: {e}")
-                    if 'response' in locals() and hasattr(response, 'prompt_feedback'):
-                        st.error(f"Detalles del bloqueo de la API: {response.prompt_feedback}")
-    
-    # --- PASO 2: VISUALIZACIÓN DE RESULTADOS Y VALIDACIÓN ---
-    if 'generated_structure' in st.session_state:
-        st.markdown("---")
-        
-        if st.button("🔍 Ver Resultados", use_container_width=True):
-            st.session_state.show_results = True
-
-        if st.session_state.get('show_results', False):
-            with st.container(border=True):
-                mostrar_indice_desplegable(st.session_state.generated_structure.get('estructura_memoria'))
-
-                
-                st.markdown("---")
-                st.subheader("Validación y Siguiente Paso")
-                feedback = st.text_area("Si necesitas cambios, indícalos aquí:", key="feedback_area")
-
-                col_val_1, col_val_2 = st.columns(2)
-                with col_val_1:
-                    if st.button("Regenerar con Feedback", use_container_width=True, disabled=not feedback):
-                        st.info("Funcionalidad de regeneración pendiente.")
-                with col_val_2:
-                    if st.button("Aceptar y Generar Guion →", type="primary", use_container_width=True):
-                        # Lógica para generar el Word (sin cambios)
-                        pass # Aquí irá la lógica del Word que vimos antes
-
-    if 'word_file' in st.session_state:
-        # La lógica de descarga no cambia
-        pass
 
     # --- BOTÓN DE VOLVER AL MENÚ DE FASES ---
     st.write("")
@@ -396,7 +355,50 @@ def phase_1_page():
     with col_back_center:
         st.button("← Volver al Menú de Fases", on_click=back_to_phases_and_cleanup, use_container_width=True, key="back_to_menu")
 
+# =============================================================================
+#                       PÁGINA 4: RESULTADOS FASE 1
+# =============================================================================
+def phase_1_results_page():
+    """Muestra el índice generado y las opciones de validación."""
+    st.markdown("<h3>FASE 1: Revisión de Resultados</h3>", unsafe_allow_html=True)
+    st.markdown("Revisa el índice propuesto por la IA. Si es correcto, genera el guion estratégico.")
+    st.markdown("---")
 
+    # Botón para volver a la página de carga de archivos
+    st.button("← Volver a Cargar Archivos", on_click=go_to_phase1)
+
+    # Contenedor con los resultados
+    with st.container(border=True):
+        mostrar_indice_desplegable(st.session_state.generated_structure.get('estructura_memoria'))
+        
+        st.markdown("---")
+        st.subheader("Validación y Siguiente Paso")
+        feedback = st.text_area("Si necesitas cambios, indícalos aquí:", key="feedback_area")
+
+        col_val_1, col_val_2 = st.columns(2)
+        with col_val_1:
+            if st.button("Regenerar con Feedback", use_container_width=True, disabled=not feedback):
+                st.info("Funcionalidad de regeneración pendiente.")
+        with col_val_2:
+            if st.button("Aceptar y Generar Guion →", type="primary", use_container_width=True):
+                # Lógica para generar el Word (sin cambios)
+                with st.spinner("✍️ Creando el documento Word con las preguntas guía..."):
+                    # ... Tu lógica para llamar a la IA con PROMPT_PREGUNTAS_TECNICAS ...
+                    st.session_state.word_file = b"Contenido simulado del Word"
+                st.success("¡Documento Word generado!")
+
+    # Mostrar el botón de descarga si el archivo Word ya está listo
+    if 'word_file' in st.session_state:
+        st.markdown("---")
+        with st.container(border=True):
+            st.subheader("Descarga del Resultado")
+            st.download_button(
+                label="📥 Descargar Guion Estratégico (.docx)",
+                data=st.session_state.word_file,
+                file_name="guion_estrategico.docx",
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                use_container_width=True
+            )
 # =============================================================================
 #                        LÓGICA PRINCIPAL (ROUTER)
 # =============================================================================
@@ -407,3 +409,5 @@ elif st.session_state.page == 'phases':
     phases_page()
 elif st.session_state.page == 'phase_1':
     phase_1_page()
+elif st.session_state.page == 'phase_1_results':
+    phase_1_results_page()
