@@ -28,7 +28,8 @@ SCOPES = [
     'https://www.googleapis.com/auth/gmail.send',
     'https://www.googleapis.com/auth/userinfo.profile',
     'https://www.googleapis.com/auth/userinfo.email',
-    'openid'  # <-- ESTE ES EL SCOPE QUE FALTABA
+    'openid',
+    'https://www.googleapis.com/auth/documents.readonly' # <-- NUEVO PERMISO
 ]
 CLIENT_CONFIG = {
     "web": {
