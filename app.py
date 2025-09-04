@@ -548,6 +548,10 @@ def phase_1_page():
     st.markdown("---")
     st.button("← Volver a Selección de Proyecto", on_click=back_to_project_selection_and_cleanup, use_container_width=True, key="back_to_projects")
 
+# =============================================================================
+#           PÁGINA 4: RESULTADOS FASE 1 (VERSIÓN FINAL CON CALLBACK)
+# =============================================================================
+
 def phase_1_results_page():
     """Página para revisar los resultados de la Fase 1, con opción de regenerar."""
     st.markdown("<h3>FASE 1: Revisión de Resultados</h3>", unsafe_allow_html=True)
@@ -559,55 +563,63 @@ def phase_1_results_page():
         st.warning("No se ha generado ninguna estructura. Por favor, vuelve a la fase anterior.")
         return
 
+    # --- NUEVA FUNCIÓN CALLBACK ---
+    # Esta función se ejecutará ANTES de que la página se redibuje.
+    def handle_regeneration():
+        feedback_text = st.session_state.feedback_area
+        if not feedback_text:
+            st.warning("Por favor, escribe tus indicaciones en el área de texto.")
+            return
+
+        with st.spinner("🧠 Incorporando tu feedback y regenerando la estructura..."):
+            try:
+                contenido_ia_regeneracion = [PROMPT_REGENERACION]
+                contenido_ia_regeneracion.append("--- INSTRUCCIONES DEL USUARIO ---\n" + feedback_text)
+                contenido_ia_regeneracion.append("--- ESTRUCTURA JSON ANTERIOR A CORREGIR ---\n" + json.dumps(st.session_state.generated_structure, indent=2))
+                
+                if st.session_state.get('uploaded_pliegos'):
+                    for pliego in st.session_state.uploaded_pliegos:
+                        contenido_ia_regeneracion.append({"mime_type": pliego.type, "data": pliego.getvalue()})
+                if st.session_state.get('uploaded_template'):
+                    contenido_ia_regeneracion.append({"mime_type": st.session_state.uploaded_template.type, "data": st.session_state.uploaded_template.getvalue()})
+
+                generation_config = genai.GenerationConfig(response_mime_type="application/json")
+                response_regeneracion = model.generate_content(contenido_ia_regeneracion, generation_config=generation_config)
+                json_limpio_str_regenerado = limpiar_respuesta_json(response_regeneracion.text)
+                
+                if json_limpio_str_regenerado:
+                    nueva_estructura = json.loads(json_limpio_str_regenerado)
+                    st.session_state.generated_structure = nueva_estructura
+                    st.toast("¡Estructura regenerada con éxito!")
+                    # Aquí es seguro modificar el estado porque estamos en un callback.
+                    st.session_state.feedback_area = ""
+                else:
+                    st.error("La IA no devolvió una estructura válida tras la regeneración.")
+            except Exception as e:
+                st.error(f"Ocurrió un error durante la regeneración: {e}")
+
     with st.container(border=True):
         mostrar_indice_desplegable(st.session_state.generated_structure.get('estructura_memoria'))
         st.markdown("---")
         st.subheader("Validación y Siguiente Paso")
-        feedback = st.text_area("Si necesitas cambios, indícalos aquí:", key="feedback_area", placeholder="Ej: 'El apartado 2. Equipo Técnico debería tener un subapartado para la experiencia y otro para las certificaciones.'")
+        
+        st.text_area("Si necesitas cambios, indícalos aquí:", key="feedback_area", placeholder="Ej: 'Une los apartados 1.1 y 1.2 en uno solo que hable del contexto general.'")
         
         col_val_1, col_val_2 = st.columns(2)
         with col_val_1:
-            # Habilitamos el botón si el usuario ha escrito algo en el área de feedback
-            if st.button("Regenerar con Feedback", use_container_width=True, disabled=not feedback):
-                
-                # --- LÓGICA DE REGENERACIÓN ---
-                with st.spinner("🧠 Incorporando tu feedback y regenerando la estructura..."):
-                    try:
-                        contenido_ia_regeneracion = [PROMPT_REGENERACION]
-                        contenido_ia_regeneracion.append("--- INSTRUCCIONES DEL USUARIO ---\n" + feedback)
-                        contenido_ia_regeneracion.append("--- ESTRUCTURA JSON ANTERIOR A CORREGIR ---\n" + json.dumps(st.session_state.generated_structure, indent=2))
-                        
-                        # Volvemos a añadir los documentos originales para que la IA tenga todo el contexto
-                        if st.session_state.get('uploaded_pliegos'):
-                            for pliego in st.session_state.uploaded_pliegos:
-                                contenido_ia_regeneracion.append({"mime_type": pliego.type, "data": pliego.getvalue()})
-                        if st.session_state.get('uploaded_template'):
-                            contenido_ia_regeneracion.append({"mime_type": st.session_state.uploaded_template.type, "data": st.session_state.uploaded_template.getvalue()})
-
-                        # Hacemos la llamada a la IA
-                        generation_config = genai.GenerationConfig(response_mime_type="application/json")
-                        response_regeneracion = model.generate_content(contenido_ia_regeneracion, generation_config=generation_config)
-                        
-                        json_limpio_str_regenerado = limpiar_respuesta_json(response_regeneracion.text)
-                        
-                        if json_limpio_str_regenerado:
-                            nueva_estructura = json.loads(json_limpio_str_regenerado)
-                            # Actualizamos la estructura en la memoria de la sesión
-                            st.session_state.generated_structure = nueva_estructura
-                            st.toast("¡Estructura regenerada con éxito!")
-                            # Limpiamos el área de feedback
-                            st.session_state.feedback_area = ""
-                            st.rerun() # Recargamos la página para mostrar el nuevo índice
-                        else:
-                            st.error("La IA no devolvió una estructura válida tras la regeneración.")
-
-                    except Exception as e:
-                        st.error(f"Ocurrió un error durante la regeneración: {e}")
+            # El botón ahora llama a la función callback usando on_click
+            st.button(
+                "Regenerar con Feedback",
+                on_click=handle_regeneration,
+                use_container_width=True,
+                disabled=not st.session_state.get("feedback_area") # Desactivado si no hay texto
+            )
 
         with col_val_2:
             if st.button("Aceptar y Generar Guion →", type="primary", use_container_width=True):
                 # La lógica para generar el guion no cambia
                 with st.spinner("✍️ Creando el guion estratégico..."):
+                    # (El resto del código para generar el guion es idéntico y correcto)
                     try:
                         contenido_ia_preguntas = [PROMPT_PREGUNTAS_TECNICAS]
                         contenido_ia_preguntas.append("--- ESTRUCTURA VALIDADA (JSON) ---\n" + json.dumps(st.session_state.generated_structure, indent=2))
