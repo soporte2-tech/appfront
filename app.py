@@ -905,10 +905,13 @@ def phase_1_results_page():
 # =============================================================================
 #           VERSIÓN AVANZADA de phase_2_page (CON ESTADOS Y RE-GENERACIÓN)
 # =============================================================================
+# =============================================================================
+#           VERSIÓN DEFINITIVA de phase_2_page (CON TODA LA LÓGICA)
+# =============================================================================
 def phase_2_page():
-    """Centro de mando para la generación y re-generación de guiones."""
+    """Centro de mando para la generación y re-generación de guiones con documentación de apoyo."""
     st.markdown("<h3>FASE 2: Centro de Mando de Guiones</h3>", unsafe_allow_html=True)
-    st.markdown("Genera los borradores iniciales, revísalos en Drive y luego re-genéralos con el feedback incorporado.")
+    st.markdown("Genera los borradores iniciales adjuntando documentación de apoyo, revísalos en Drive y luego re-genéralos con el feedback incorporado.")
     st.markdown("---")
 
     # --- SETUP INICIAL ---
@@ -925,10 +928,86 @@ def phase_2_page():
     with st.spinner("Sincronizando con Google Drive..."):
         pliegos_folder_id = find_or_create_folder(service, "Pliegos", parent_id=project_folder_id)
         guiones_folder_id = find_or_create_folder(service, "Guiones de Subapartados", parent_id=project_folder_id)
+        contexto_folder_id = find_or_create_folder(service, "Contexto empresa", parent_id=project_folder_id)
         
         pliegos_en_drive = get_files_in_project(service, pliegos_folder_id)
         guiones_en_drive = get_files_in_project(service, guiones_folder_id)
         nombres_guiones_existentes = [f['name'] for f in guiones_en_drive]
+
+    # --- LÓGICA DE ACCIONES (GENERAR Y RE-GENERAR) ---
+    def ejecutar_generacion(titulo, indicaciones):
+        """Función para la generación inicial de un borrador."""
+        nombre_archivo = re.sub(r'[\\/*?:"<>|]', "", titulo) + ".docx"
+        with st.spinner(f"Generando borrador para '{titulo}'..."):
+            try:
+                # Preparamos el contenido para la IA
+                contenido_ia = [PROMPT_PREGUNTAS_TECNICAS_INDIVIDUAL]
+                contenido_ia.append("--- INDICACIONES PARA ESTE APARTADO ---\n" + json.dumps(indicaciones, indent=2))
+                # Añadimos los pliegos
+                for file_info in pliegos_en_drive:
+                    file_content_bytes = download_file_from_drive(service, file_info['id'])
+                    contenido_ia.append({"mime_type": file_info['mimeType'], "data": file_content_bytes.getvalue()})
+                # Añadimos la documentación de apoyo si existe
+                doc_extra = st.session_state[f"upload_{titulo}"]
+                if doc_extra:
+                    contenido_ia.append("--- DOCUMENTACIÓN DE APOYO ADICIONAL ---\n")
+                    contenido_ia.append({"mime_type": doc_extra.type, "data": doc_extra.getvalue()})
+                    # Guardamos el doc de apoyo en 'Contexto empresa'
+                    upload_file_to_drive(service, doc_extra, contexto_folder_id)
+
+                # Llamada a la IA
+                response = model.generate_content(contenido_ia)
+                # Creación y guardado del DOCX
+                documento = docx.Document()
+                agregar_markdown_a_word(documento, response.text)
+                doc_io = io.BytesIO()
+                documento.save(doc_io)
+                word_file_obj = io.BytesIO(doc_io.getvalue())
+                word_file_obj.name = nombre_archivo
+                word_file_obj.type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                upload_file_to_drive(service, word_file_obj, guiones_folder_id)
+                st.toast(f"Borrador para '{titulo}' generado y guardado.")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Error al generar '{titulo}': {e}")
+
+    def ejecutar_regeneracion(titulo, file_id_borrador):
+        """Función para la re-generación con feedback."""
+        nombre_archivo = re.sub(r'[\\/*?:"<>|]', "", titulo) + ".docx"
+        with st.spinner(f"Re-generando '{titulo}' con feedback de Drive..."):
+            try:
+                # Descargamos el .docx de Drive y extraemos su texto
+                doc_bytes = download_file_from_drive(service, file_id_borrador)
+                documento_revisado = docx.Document(doc_bytes)
+                texto_revisado = "\n".join([p.text for p in documento_revisado.paragraphs])
+                
+                # Preparamos el contenido para la IA
+                contenido_ia = [PROMPT_CONSULTOR_REVISION]
+                contenido_ia.append("--- BORRADOR ORIGINAL / TEXTO REVISADO Y COMENTARIOS ---\n" + texto_revisado)
+                # Añadimos los pliegos para contexto estratégico
+                for file_info in pliegos_en_drive:
+                    file_content_bytes = download_file_from_drive(service, file_info['id'])
+                    contenido_ia.append({"mime_type": file_info['mimeType'], "data": file_content_bytes.getvalue()})
+
+                # Llamada a la IA
+                response = model.generate_content(contenido_ia)
+                # Creación y guardado del nuevo DOCX (reemplaza el anterior)
+                documento = docx.Document()
+                agregar_markdown_a_word(documento, response.text)
+                doc_io = io.BytesIO()
+                documento.save(doc_io)
+                word_file_obj = io.BytesIO(doc_io.getvalue())
+                word_file_obj.name = nombre_archivo
+                word_file_obj.type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                
+                # Borramos el archivo antiguo y subimos el nuevo
+                delete_file_from_drive(service, file_id_borrador)
+                upload_file_to_drive(service, word_file_obj, guiones_folder_id)
+                st.toast(f"Guion para '{titulo}' re-generado con éxito.")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Error al re-generar '{titulo}': {e}")
+
 
     # --- INTERFAZ DE GESTIÓN DE GUIONES ---
     st.subheader("Gestión de Guiones de Subapartados")
@@ -939,44 +1018,39 @@ def phase_2_page():
         
         nombre_archivo_esperado = re.sub(r'[\\/*?:"<>|]', "", subapartado_titulo) + ".docx"
         
-        # Determinamos el estado del guion
         estado = "⚪ No Generado"
-        if nombre_archivo_esperado in nombres_guiones_existentes:
+        file_info = next((f for f in guiones_en_drive if f['name'] == nombre_archivo_esperado), None)
+        if file_info:
             estado = "📄 Generado"
-            file_info = next((f for f in guiones_en_drive if f['name'] == nombre_archivo_esperado), None)
             
         with st.container(border=True):
-            col1, col2, col3 = st.columns([4, 1, 2])
+            col1, col2 = st.columns([1.5, 2])
             with col1:
                 st.write(f"**{subapartado_titulo}**")
                 st.caption(f"Estado: {estado}")
-            
+                if estado == "⚪ No Generado":
+                    # El file_uploader solo aparece si el guion no ha sido generado
+                    st.file_uploader("Aportar documentación de apoyo", type=['pdf', 'docx', 'txt'], key=f"upload_{subapartado_titulo}", label_visibility="collapsed")
+
             with col2:
+                # Contenedor para los botones de acción
+                btn_container = st.container()
                 if estado == "📄 Generado":
                     link = f"https://docs.google.com/document/d/{file_info['id']}/edit"
-                    st.link_button("Revisar en Drive", link)
-            
-            with col3:
-                # --- Lógica de los botones de acción ---
-                if estado == "⚪ No Generado":
-                    if st.button("Generar Borrador", key=f"gen_{i}", use_container_width=True):
-                        # (Aquí iría la lógica de la generación inicial que ya teníamos)
-                        st.info("Lógica de generación inicial pendiente de conectar.")
-
-                elif estado == "📄 Generado":
-                    if st.button("Re-Generar con Feedback", key=f"regen_{i}", type="primary", use_container_width=True):
-                        # (Aquí irá la lógica de re-generación con el nuevo prompt)
-                        st.info("Lógica de re-generación pendiente de conectar.")
-
+                    btn_container.link_button("Revisar en Drive", link, use_container_width=True)
+                    if btn_container.button("Re-Generar con Feedback", key=f"regen_{i}", type="primary", use_container_width=True):
+                        ejecutar_regeneracion(subapartado_titulo, file_info['id'])
+                else: # estado == "⚪ No Generado"
+                    if btn_container.button("Generar Borrador", key=f"gen_{i}", use_container_width=True):
+                        indicaciones = next((m for m in matices if m['subapartado'] == subapartado_titulo), None)
+                        ejecutar_generacion(subapartado_titulo, indicaciones)
+    
     st.markdown("---")
     # Botones de navegación al final de la página
-    col_nav1, col_nav2, col_nav3 = st.columns(3)
+    col_nav1, col_nav2 = st.columns(2)
     with col_nav1:
         st.button("← Volver a Revisión de Índice (F1)", on_click=go_to_phase1_results, use_container_width=True)
     with col_nav2:
-        # Placeholder para un botón de "Generar todos"
-        st.button("Generar Todos los Borradores", disabled=True, use_container_width=True)
-    with col_nav3:
         st.button("Ir a Plan de Prompts (F3) →", on_click=go_to_phase3, use_container_width=True)
 # =============================================================================
 
