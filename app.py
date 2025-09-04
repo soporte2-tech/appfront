@@ -39,6 +39,22 @@ def upload_file_to_drive(service, file_object, folder_id):
     st.toast(f"📄 Archivo '{file_object.name}' guardado en Drive.")
     return file.get('id')
 
+def delete_file_from_drive(service, file_id):
+    """Elimina un archivo de Drive por su ID."""
+    try:
+        service.files().delete(fileId=file_id).execute()
+        return True
+    except HttpError as error:
+        st.error(f"No se pudo eliminar el archivo: {error}")
+        return False
+
+def find_file_by_name(service, file_name, folder_id):
+    """Busca un archivo por nombre dentro de una carpeta específica."""
+    query = f"name = '{file_name}' and '{folder_id}' in parents and trashed = false"
+    response = service.files().list(q=query, spaces='drive', fields='files(id)').execute()
+    files = response.get('files', [])
+    return files[0]['id'] if files else None
+    
 # --- CONFIGURACIÓN DE LA PÁGINA ---
 st.set_page_config(page_title="Asistente de Licitaciones AI", layout="wide", initial_sidebar_state="collapsed")
 
@@ -483,7 +499,7 @@ def project_selection_page():
 # =============================================================================
 
 def phase_1_page():
-    """Página de Fase 1 que comprueba archivos en Drive antes de pedir subirlos."""
+    """Página de Fase 1 con gestión completa de archivos e índices en Drive."""
     if not st.session_state.get('selected_project'):
         st.warning("No se ha seleccionado ningún proyecto. Volviendo a la selección.")
         go_to_project_selection()
@@ -496,107 +512,81 @@ def phase_1_page():
     st.markdown(f"<h3>FASE 1: Análisis y Estructura</h3>", unsafe_allow_html=True)
     st.info(f"Estás trabajando en el proyecto: **{project_name}**")
 
-    # 1. Comprobar si ya existen archivos en la carpeta del proyecto en Drive
-    with st.spinner("Buscando archivos existentes en tu Drive..."):
-        existing_files = get_files_in_project(service, project_folder_id)
-
-    # Si NO encontramos archivos, mostramos la interfaz de subida
-    if not existing_files:
-        st.markdown("Carga los documentos base para este proyecto. Se guardarán en Drive para el futuro.")
+    # Re-evaluamos los archivos existentes cada vez que se carga la página
+    existing_files = get_files_in_project(service, project_folder_id)
+    document_files = [f for f in existing_files if f['name'] != 'ultimo_indice.json']
+    
+    # --- VISTA DE ARCHIVOS EXISTENTES (SI LOS HAY) ---
+    if document_files:
+        st.success("Hemos encontrado estos archivos en tu Drive para este proyecto:")
         with st.container(border=True):
-            st.subheader("PASO 1: Carga de Documentos")
-            has_template = st.radio("¿Dispones de una plantilla?", ("No", "Sí"), horizontal=True, key="template_radio")
-            
-            uploaded_template = None
-            if has_template == 'Sí':
-                uploaded_template = st.file_uploader("Sube tu plantilla (DOCX/PDF)", type=['docx', 'pdf'], key="template_uploader")
-            
-            uploaded_pliegos = st.file_uploader("Sube los Pliegos (DOCX/PDF)", type=['docx', 'pdf'], accept_multiple_files=True, key="pliegos_uploader")
-
-        if st.button("Generar Estructura y Guardar Archivos", type="primary", use_container_width=True):
-            if not uploaded_pliegos:
-                st.warning("Por favor, sube al menos un archivo de Pliegos.")
-            else:
-                with st.spinner("Guardando archivos en Drive y analizando..."):
-                    # 2. Guardar los nuevos archivos en Drive
-                    try:
-                        if uploaded_template:
-                            upload_file_to_drive(service, uploaded_template, project_folder_id)
-                        for pliego in uploaded_pliegos:
-                            upload_file_to_drive(service, pliego, project_folder_id)
-                        
-                        # Guardamos en session_state para la siguiente página
-                        st.session_state.uploaded_pliegos = uploaded_pliegos
-                        st.session_state.uploaded_template = uploaded_template
-
-                        # 3. La misma lógica de análisis de IA que ya tenías
-                        # ... (código de llamada a Gemini)
-                        contenido_ia = []
-                        texto_plantilla = ""
-                        if has_template == 'Sí' and uploaded_template is not None:
-                            prompt_a_usar = PROMPT_PLANTILLA
-                            if uploaded_template.name.endswith('.docx'):
-                                doc = docx.Document(uploaded_template)
-                                texto_plantilla = "\n".join([p.text for p in doc.paragraphs])
-                            else:
-                                reader = PdfReader(uploaded_template)
-                                texto_plantilla = "\n".join([page.extract_text() for page in reader.pages])
+            cols = st.columns([4, 1])
+            for i, file in enumerate(document_files):
+                cols[0].write(f"📄 **{file['name']}**")
+                # Botón de eliminar con una clave única para cada archivo
+                if cols[1].button("Eliminar", key=f"del_{file['id']}", type="secondary"):
+                    with st.spinner(f"Eliminando '{file['name']}'..."):
+                        if delete_file_from_drive(service, file['id']):
+                            st.toast(f"Archivo '{file['name']}' eliminado.")
+                            st.rerun() # Recargamos para actualizar la lista
                         else:
-                            prompt_a_usar = PROMPT_PLIEGOS
-
-                        contenido_ia.append(prompt_a_usar)
-                        if texto_plantilla:
-                            contenido_ia.append(texto_plantilla)
-
-                        for pliego in uploaded_pliegos:
-                            contenido_ia.append({"mime_type": pliego.type, "data": pliego.getvalue()})
-
-                        generation_config = genai.GenerationConfig(response_mime_type="application/json")
-                        response = model.generate_content(contenido_ia, generation_config=generation_config)
-                        
-                        json_limpio_str = limpiar_respuesta_json(response.text)
-                        if json_limpio_str:
-                            informacion_estructurada = json.loads(json_limpio_str)
-                            st.session_state.generated_structure = informacion_estructurada
-                            go_to_phase1_results()
-                            st.rerun()
-                        else:
-                            st.error("La IA devolvió una respuesta vacía o no válida.")
-                    except Exception as e:
-                        st.error(f"Ocurrió un error: {e}")
-
-    # Si SÍ encontramos archivos, los mostramos y damos la opción de usarlos
+                            st.error("No se pudo eliminar el archivo.")
     else:
-        st.success("¡Hemos encontrado estos archivos en tu Drive para este proyecto!")
-        with st.container(border=True):
-            for file in existing_files:
-                st.write(f"📄 **{file['name']}**")
+        st.info("Este proyecto aún no tiene documentos. Sube los archivos base a continuación.")
 
-        if st.button("Analizar Archivos Existentes", type="primary", use_container_width=True):
+    # --- ZONA PARA AÑADIR/SUBIR NUEVOS ARCHIVOS ---
+    with st.expander("Añadir o reemplazar documentación", expanded=not document_files):
+        with st.container(border=True):
+            st.subheader("Subir nuevos documentos")
+            has_template = st.radio("¿El nuevo archivo es una plantilla?", ("No", "Sí"), horizontal=True, key="template_radio")
+            new_files_uploader = st.file_uploader("Arrastra aquí los nuevos Pliegos o Plantilla", type=['docx', 'pdf'], accept_multiple_files=True, key="new_files_uploader")
+            
+            if st.button("Guardar nuevos archivos en Drive"):
+                if new_files_uploader:
+                    with st.spinner("Subiendo archivos a tu proyecto en Drive..."):
+                        for file_obj in new_files_uploader:
+                            upload_file_to_drive(service, file_obj, project_folder_id)
+                        st.rerun()
+                else:
+                    st.warning("Por favor, selecciona al menos un archivo para subir.")
+
+    st.markdown("---")
+
+    # --- GESTIÓN Y GENERACIÓN DE ÍNDICES ---
+    st.header("Análisis y Generación de Índice")
+
+    # Comprobamos si existe un índice guardado
+    saved_index_id = find_file_by_name(service, "ultimo_indice.json", project_folder_id)
+
+    if saved_index_id:
+        st.info("Hemos encontrado un índice generado anteriormente para este proyecto.")
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("Cargar último índice generado", use_container_width=True):
+                with st.spinner("Cargando índice desde Drive..."):
+                    index_content_bytes = download_file_from_drive(service, saved_index_id)
+                    index_data = json.loads(index_content_bytes.getvalue().decode('utf-8'))
+                    st.session_state.generated_structure = index_data
+                    st.session_state.uploaded_pliegos = document_files # Pasamos los archivos para el guion
+                    go_to_phase1_results()
+                    st.rerun()
+        with col2:
+            st.button("Generar un nuevo índice desde cero", type="primary", use_container_width=True, key="generate_new_anyway")
+    
+    # Si no hay índice guardado, o si el usuario quiere generar uno nuevo
+    if not saved_index_id or st.session_state.get("generate_new_anyway"):
+        if not document_files:
+             st.warning("Debes subir documentos antes de poder generar un índice.")
+        elif st.button("Analizar Archivos y Generar Índice", type="primary", use_container_width=True, key="generate_from_docs"):
             with st.spinner("Descargando archivos de Drive y analizando..."):
                 try:
-                    # 4. Descargar los archivos de Drive a la memoria para analizarlos
                     downloaded_files_for_ia = []
-                    mock_uploaded_files = [] # Para la página de resultados
-                    
-                    for file in existing_files:
+                    # (Lógica de descarga y llamada a la IA, similar a la anterior)
+                    for file in document_files:
                         file_content_bytes = download_file_from_drive(service, file['id'])
                         downloaded_files_for_ia.append({"mime_type": file['mimeType'], "data": file_content_bytes.getvalue()})
-                        
-                        # Creamos un "falso" UploadedFile para que la página de resultados funcione igual
-                        mock_file = io.BytesIO(file_content_bytes.getvalue())
-                        mock_file.name = file['name']
-                        mock_file.type = file['mimeType']
-                        mock_uploaded_files.append(mock_file)
 
-                    # Guardamos en session_state para la siguiente página
-                    # Aquí asumimos que el primer archivo es la plantilla si hay más de uno,
-                    # puedes mejorar esta lógica si lo necesitas.
-                    st.session_state.uploaded_pliegos = mock_uploaded_files
-                    st.session_state.uploaded_template = None # O lo identificas por nombre
-
-                    # 5. Misma lógica de análisis, pero con los archivos descargados
-                    contenido_ia = [PROMPT_PLIEGOS] # Asumimos que no hay plantilla si usamos archivos existentes
+                    contenido_ia = [PROMPT_PLIEGOS]
                     contenido_ia.extend(downloaded_files_for_ia)
                     
                     generation_config = genai.GenerationConfig(response_mime_type="application/json")
@@ -606,11 +596,23 @@ def phase_1_page():
                     if json_limpio_str:
                         informacion_estructurada = json.loads(json_limpio_str)
                         st.session_state.generated_structure = informacion_estructurada
+
+                        # Guardamos el nuevo índice en Drive
+                        json_bytes = json.dumps(informacion_estructurada, indent=2).encode('utf-8')
+                        mock_file_obj = io.BytesIO(json_bytes)
+                        mock_file_obj.name = "ultimo_indice.json"
+                        mock_file_obj.type = "application/json"
+                        
+                        # Si ya existía, lo borramos para reemplazarlo
+                        if saved_index_id:
+                            delete_file_from_drive(service, saved_index_id)
+                        upload_file_to_drive(service, mock_file_obj, project_folder_id)
+
+                        st.session_state.uploaded_pliegos = document_files # Pasamos los archivos para el guion
                         go_to_phase1_results()
                         st.rerun()
                     else:
                         st.error("La IA devolvió una respuesta vacía o no válida.")
-
                 except Exception as e:
                     st.error(f"Ocurrió un error: {e}")
 
