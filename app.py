@@ -540,8 +540,12 @@ def project_selection_page():
 #           COPIA Y PEGA ESTA FUNCIÓN EN TU CÓDIGO
 # =============================================================================
 
+# =============================================================================
+#           VERSIÓN DEFINITIVA DE phase_1_page()
+# =============================================================================
+
 def phase_1_page():
-    """Página de Fase 1 con gestión completa y lógica de estado corregida."""
+    """Página de Fase 1 que lee/escribe en subcarpetas y gestiona el estado correctamente."""
     if not st.session_state.get('selected_project'):
         st.warning("No se ha seleccionado ningún proyecto. Volviendo a la selección.")
         go_to_project_selection()
@@ -553,17 +557,16 @@ def phase_1_page():
 
     st.markdown(f"<h3>FASE 1: Análisis y Estructura</h3>", unsafe_allow_html=True)
     st.info(f"Estás trabajando en el proyecto: **{project_name}**")
-    
-    # Buscamos o creamos la subcarpeta 'Pliegos' y obtenemos su ID
+
+    # 1. Buscamos o creamos la subcarpeta 'Pliegos' y obtenemos su ID
     pliegos_folder_id = find_or_create_folder(service, "Pliegos", parent_id=project_folder_id)
-    # Buscamos los archivos DENTRO de la carpeta Pliegos
-    document_files = get_files_in_project(service, pliegos_folder_id)
-    # Gestión de archivos (esta parte ya funciona bien)
-    existing_files = get_files_in_project(service, project_folder_id)
-    document_files = [f for f in existing_files if f['name'] != 'ultimo_indice.json']
     
+    # 2. Buscamos los archivos DENTRO de esa subcarpeta 'Pliegos'
+    document_files = get_files_in_project(service, pliegos_folder_id)
+    
+    # 3. Mostramos SOLO los archivos encontrados en 'Pliegos'
     if document_files:
-        st.success("Hemos encontrado estos archivos en tu Drive para este proyecto:")
+        st.success("Hemos encontrado estos archivos en la carpeta 'Pliegos' de tu proyecto:")
         with st.container(border=True):
             for file in document_files:
                 cols = st.columns([4, 1])
@@ -574,34 +577,30 @@ def phase_1_page():
                             st.toast(f"Archivo '{file['name']}' eliminado.")
                             st.rerun()
     else:
-        st.info("Este proyecto aún no tiene documentos. Sube los archivos base a continuación.")
+        st.info("La carpeta 'Pliegos' de este proyecto está vacía. Sube los archivos base.")
 
-    with st.expander("Añadir o reemplazar documentación", expanded=not document_files):
+    with st.expander("Añadir o reemplazar documentación en la carpeta 'Pliegos'", expanded=not document_files):
         with st.container(border=True):
             st.subheader("Subir nuevos documentos")
             new_files_uploader = st.file_uploader("Arrastra aquí los nuevos Pliegos o Plantilla", type=['docx', 'pdf'], accept_multiple_files=True, key="new_files_uploader")
             if st.button("Guardar nuevos archivos en Drive"):
                 if new_files_uploader:
-                    with st.spinner("Subiendo archivos a tu proyecto en Drive..."):
+                    with st.spinner("Subiendo archivos a la carpeta 'Pliegos'..."):
                         for file_obj in new_files_uploader:
-                            upload_file_to_drive(service, file_obj, project_folder_id)
+                            # 4. Guardamos los nuevos archivos DENTRO de la subcarpeta 'Pliegos'
+                            upload_file_to_drive(service, file_obj, pliegos_folder_id)
                         st.rerun()
                 else:
                     st.warning("Por favor, selecciona al menos un archivo para subir.")
 
     st.markdown("---")
     st.header("Análisis y Generación de Índice")
-
-    # --- !! COMIENZO DE LA LÓGICA CORREGIDA !! ---
     
-    # Buscamos si hay un índice guardado DENTRO de la carpeta del proyecto (no en subcarpetas)
-    docs_app_folder_id = find_or_create_folder(service, "Documentos aplicación", parent_id=project_folder_id)   
-    saved_index_id = find_file_by_name(service, "ultimo_indice.json", project_folder_id)
+    docs_app_folder_id = find_or_create_folder(service, "Documentos aplicación", parent_id=project_folder_id)
+    saved_index_id = find_file_by_name(service, "ultimo_indice.json", docs_app_folder_id)
 
-    # Creamos las columnas para los botones de acción
     col1, col2 = st.columns(2)
 
-    # Botón para cargar el índice existente (si existe)
     with col1:
         if st.button("Cargar último índice generado", use_container_width=True, disabled=not saved_index_id):
             with st.spinner("Cargando índice desde Drive..."):
@@ -612,10 +611,9 @@ def phase_1_page():
                 go_to_phase1_results()
                 st.rerun()
 
-    # Botón para analizar y generar un nuevo índice (siempre disponible si hay documentos)
     with col2:
         if st.button("Analizar Archivos y Generar Nuevo Índice", type="primary", use_container_width=True, disabled=not document_files):
-            with st.spinner("Descargando archivos de Drive y analizando..."):
+            with st.spinner("Descargando archivos de 'Pliegos' y analizando..."):
                 try:
                     downloaded_files_for_ia = []
                     for file in document_files:
@@ -640,12 +638,9 @@ def phase_1_page():
                 except Exception as e:
                     st.error(f"Ocurrió un error: {e}")
 
-    # --- !! FIN DE LA LÓGICA CORREGIDA !! ---
-
     st.write("")
     st.markdown("---")
     st.button("← Volver a Selección de Proyecto", on_click=back_to_project_selection_and_cleanup, use_container_width=True, key="back_to_projects")
-
 # =============================================================================
 #           VERSIÓN FINAL Y COMPLETA DE phase_1_results_page()
 # =============================================================================
