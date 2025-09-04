@@ -335,6 +335,45 @@ Te proporcionaré DOS elementos clave:
 2.  La estructura que se ha generado en el mensaje anterior con los apartados y las anotaciones.
 """
 
+PROMPT_PREGUNTAS_TECNICAS_INDIVIDUAL = """
+Actúa como un planificador de licitación. Te quieres presentar a una licitación y debes crear un documento enfocando el contenido que aparecerá en este para que tus compañeros vean tu propuesta
+y la validen y complementen. Tu objetivo será crear una propuesta de contenido ganadora basándote en lo que se pide en los pliegos para que tus compañeros sólo den el ok
+y se pueda mandar el contenido a un redactor para que simplemente profundice en lo que tu has planteado. Esa "mini memoria técnica" será la que se le dará a un compañaero que se dedica a redactar.
+
+!! Tu respuesta debe centrarse EXCLUSIVAMENTE en el apartado proporcionado. No incluyas un índice general ni el título "Propuesta de contenido para...". Empieza directamente con el desarrollo del apartado. !!
+Para el apartado proporcionado, debes responder a dos preguntas: "qué se debe incluir en este apartado" y "el contenido propuesto para ese apartado".
+
+La primera pregunta ("Qué se debe incluir...") debe ser un resumen de todo lo que se pide en el pliego para ese apartado. Debes detallar qué aspectos se valoran, qué información se detallará en profundidad, cuáles son los puntos generales que tocarás, qué aspectos se valoran según el pliego técnico y las puntuaciones relativas. Usa párrafos y bullet points.
+
+La segunda pregunta ("Contenido propuesto...") debe ser tu propuesta de contenido para obtener la mayor puntuación. Detállala ampliamente de manera esquemática, enfocando en el contenido (no en la explicación). Desgrana el contenido general en preguntas más pequeñas y da respuestas detalladas que expliquen muy bien las actividades, metodologías y conceptos.
+
+Para cada apartado y subapartado del índice, desarrollarás el contenido siguiendo OBLIGATORIAMENTE estas 6 REGLAS DE ORO:
+
+    1.  **TONO PROFESIONAL E IMPERSONAL:** Redacta siempre en tercera persona. Elimina CUALQUIER referencia personal (ej. "nosotros", "nuestra propuesta"). Usa formulaciones como "El servicio se articula en...", "La metodología implementada será...".
+
+    2.  **CONCRECIÓN ABSOLUTA (EL "CÓMO"):** Cada afirmación general DEBE ser respaldada por una acción concreta, una herramienta específica (ej. CRM HubSpot for Startups, WhatsApp Business API), una métrica medible o un entregable tangible. Evita las frases vacías.
+
+    3.  **ENFOQUE EN EL USUARIO FINAL (BUYER PERSONA):** Orienta todo el contenido a resolver los problemas del buyer persona objetivo de esa licitación. Demuestra un profundo conocimiento de su perfil, retos (burocracia, aislamiento) y objetivos (viabilidad, crecimiento).
+
+    4.  **LONGITUD CONTROLADA POR PALABRAS:** El desarrollo completo de la "Propuesta de Contenido" debe tener una extensión total de entre 6.000 y 8.000 palabras. Distribuye el contenido de forma equilibrada entre los apartados para alcanzar este objetivo sin generar texto de relleno.
+
+    5.  **PROPUESTA DE VALOR ESTRATÉGICA:** Enfócate en los resultados y el valor añadido. En esta memoria no busques adornar las ideas, centrate en mostrar las ideas de una manera fácil de ver y clara.
+
+    6.  **ALINEACIÓN TOTAL CON EL PLIEGO (PPT):** La justificación de cada acción debe ser su alineación con los requisitos del Pliego y el valor que aporta para obtener la máxima puntuación.
+
+    Para el desarrollo de cada apartado en la PARTE 2, usa este formato:
+    -   **"Qué se debe incluir en este apartado (Análisis del Pliego)":** Resume los requisitos del PPT, criterios de evaluación y puntuación.
+    -   **"Contenido Propuesto para el Apartado":** Aplica aquí las 6 Reglas de Oro, desarrollando la propuesta de forma concreta, estratégica y detallada.
+
+En este documento solo deberán aparecer los apartados angulares de la propuesta. Se omitirán los de presentación, los de introducción y los que no vayan directamente asociados a definir lo principal de la licitación. Normalmente lo prinicipal es la metodología, las actividades que se van a hacer y la planificación con su cronograma correspondiente.
+
+Te proporcionaré TRES elementos clave:
+1.  El texto completo de los documentos base (Pliegos).
+2.  Las indicaciones para el apartado específico que debes desarrollar (extraídas de un JSON de estructura).
+3.  Documentación de apoyo adicional (opcional) que el usuario haya subido para este apartado.
+"""
+
+
 PROMPT_REGENERACION = """
 Actúas como un editor experto que refina una estructura JSON para una memoria técnica.
 Te proporcionaré TRES elementos clave:
@@ -823,6 +862,9 @@ def phase_1_results_page():
 #           REEMPLAZA phase_2_page() POR ESTA VERSIÓN COMPLETA
 # =============================================================================
 
+# =============================================================================
+#           VERSIÓN FINAL Y COMPLETA DE phase_2_page
+# =============================================================================
 def phase_2_page():
     """Página para la generación granular de contenido para cada subapartado."""
     st.markdown("<h3>FASE 2: Generación de Contenido por Apartados</h3>", unsafe_allow_html=True)
@@ -834,114 +876,104 @@ def phase_2_page():
         if st.button("Ir a Fase 1"): go_to_phase1(); st.rerun()
         return
 
-    # Extraemos la lista plana de subapartados del índice
     matices = st.session_state.generated_structure.get('matices_desarrollo', [])
     
-    # Usaremos el session_state para mantener la selección y los archivos subidos
-    if 'selected_subapartados' not in st.session_state:
-        st.session_state.selected_subapartados = {}
-    if 'extra_docs' not in st.session_state:
-        st.session_state.extra_docs = {}
+    if 'selected_subapartados' not in st.session_state: st.session_state.selected_subapartados = {item.get('subapartado'): False for item in matices}
+    if 'extra_docs' not in st.session_state: st.session_state.extra_docs = {}
 
-    # Creamos el formulario para que todos los widgets se envíen juntos
     with st.form("generacion_guiones_form"):
         st.subheader("Selección de Apartados")
         
         for i, item in enumerate(matices):
             subapartado_titulo = item.get('subapartado', f'Apartado sin título {i+1}')
-            
-            # Usamos columnas para alinear checkbox, título y file_uploader
             col1, col2, col3 = st.columns([0.5, 4, 3])
             
             with col1:
-                # El valor del checkbox se guarda en session_state
-                st.session_state.selected_subapartados[subapartado_titulo] = st.checkbox("", key=f"check_{i}")
+                st.checkbox("", key=f"check_{subapartado_titulo}", value=st.session_state.selected_subapartados.get(subapartado_titulo, False))
             with col2:
                 st.write(f"**{subapartado_titulo}**")
             with col3:
-                # El file_uploader también se guarda en session_state
-                st.session_state.extra_docs[subapartado_titulo] = st.file_uploader(
-                    "Aportar documentación extra", 
-                    type=['pdf', 'docx', 'txt'], 
-                    key=f"upload_{i}",
-                    label_visibility="collapsed"
-                )
+                st.file_uploader("Aportar documentación extra", type=['pdf', 'docx', 'txt'], key=f"upload_{subapartado_titulo}", label_visibility="collapsed")
 
-        st.markdown("---")
-        # El botón de envío del formulario
         submitted = st.form_submit_button("Generar Guion(es) para los Apartados Seleccionados", type="primary")
 
     if submitted:
-        apartados_a_generar = [
-            titulo for titulo, seleccionado in st.session_state.selected_subapartados.items() if seleccionado
-        ]
+        # Actualizamos el estado desde los widgets del formulario
+        for item in matices:
+            titulo = item.get('subapartado')
+            st.session_state.selected_subapartados[titulo] = st.session_state[f"check_{titulo}"]
+            st.session_state.extra_docs[titulo] = st.session_state[f"upload_{titulo}"]
+
+        apartados_a_generar = [titulo for titulo, seleccionado in st.session_state.selected_subapartados.items() if seleccionado]
 
         if not apartados_a_generar:
             st.warning("Por favor, selecciona al menos un apartado para generar.")
         else:
             service = st.session_state.drive_service
             project_folder_id = st.session_state.selected_project['id']
-            docs_app_folder_id = find_or_crear_carpeta(servicio, "Documentos aplicación", parent_id=project_folder_id)
+            docs_app_folder_id = find_or_create_folder(service, "Documentos aplicación", parent_id=project_folder_id)
+            pliegos_folder_id = find_or_create_folder(service, "Pliegos", parent_id=project_folder_id)
 
             total_apartados = len(apartados_a_generar)
             st.info(f"Iniciando la generación de {total_apartados} documento(s)...")
             
             progress_bar = st.progress(0, text="Iniciando...")
+            
+            # Descargamos los pliegos UNA SOLA VEZ para no repetir en el bucle
+            pliegos_ia = []
+            with st.spinner("Cargando pliegos de contexto..."):
+                pliegos_en_drive = get_files_in_project(service, pliegos_folder_id)
+                for file_info in pliegos_en_drive:
+                    file_content_bytes = download_file_from_drive(service, file_info['id'])
+                    pliegos_ia.append({"mime_type": file_info['mimeType'], "data": file_content_bytes.getvalue()})
 
             for idx, titulo in enumerate(apartados_a_generar):
-                progress_text = f"Generando contenido para: **{titulo}** ({idx+1}/{total_apartados})"
+                progress_text = f"Generando: {titulo} ({idx+1}/{total_apartados})"
                 progress_bar.progress((idx) / total_apartados, text=progress_text)
                 
                 with st.spinner(progress_text):
                     try:
-                        # Buscamos las indicaciones para este apartado
                         indicaciones = next((item for item in matices if item['subapartado'] == titulo), None)
                         
-                        contenido_ia = [PROMPT_GUION_INDIVIDUAL]
-                        contenido_ia.append(json.dumps(indicaciones, indent=2))
+                        # --- CONSTRUCCIÓN DE LA ENTRADA PARA LA IA ---
+                        contenido_ia = [PROMPT_PREGUNTAS_TECNICAS_INDIVIDUAL]
                         
-                        # Añadimos los pliegos originales para dar contexto
-                        if st.session_state.get('uploaded_pliegos'):
-                            for file_info in st.session_state.uploaded_pliegos:
-                                file_content_bytes = download_file_from_drive(service, file_info['id'])
-                                contenido_ia.append({"mime_type": file_info['mimeType'], "data": file_content_bytes.getvalue()})
+                        # 1. Indicaciones del JSON
+                        contenido_ia.append("--- INDICACIONES PARA ESTE APARTADO ---\n" + json.dumps(indicaciones, indent=2))
 
-                        # Añadimos el documento de apoyo si existe
+                        # 2. Pliegos (ya descargados)
+                        contenido_ia.extend(pliegos_ia)
+
+                        # 3. Documento de apoyo (si existe)
                         doc_extra = st.session_state.extra_docs.get(titulo)
                         if doc_extra:
+                            contenido_ia.append("--- DOCUMENTACIÓN DE APOYO ADICIONAL ---\n")
                             contenido_ia.append({"mime_type": doc_extra.type, "data": doc_extra.getvalue()})
 
-                        # Llamada a la IA
                         response = model.generate_content(contenido_ia)
                         
-                        # Creamos y guardamos el documento Word
                         documento = docx.Document()
-                        documento.add_heading(titulo, level=1)
+                        # No añadimos el título, ya que el prompt lo genera
                         agregar_markdown_a_word(documento, response.text)
                         
                         doc_io = io.BytesIO()
                         documento.save(doc_io)
-                        doc_io.seek(0)
                         
-                        # Creamos un objeto de archivo para subir a Drive
                         word_file_obj = io.BytesIO(doc_io.getvalue())
-                        # Limpiamos el nombre del archivo para que sea válido
                         nombre_archivo_limpio = re.sub(r'[\\/*?:"<>|]', "", titulo) + ".docx"
                         word_file_obj.name = nombre_archivo_limpio
                         word_file_obj.type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                         
-                        # Reemplazamos si ya existía
                         existing_file_id = find_file_by_name(service, nombre_archivo_limpio, docs_app_folder_id)
                         if existing_file_id:
                             delete_file_from_drive(service, existing_file_id)
-                        
                         upload_file_to_drive(service, word_file_obj, docs_app_folder_id)
 
                     except Exception as e:
-                        st.error(f"Ocurrió un error al generar el guion para '{titulo}': {e}")
+                        st.error(f"Error al generar '{titulo}': {e}")
             
             progress_bar.progress(1.0, text="¡Proceso completado!")
-            st.success(f"Se han generado y guardado {total_apartados} documento(s) en la carpeta 'Documentos aplicación' de tu proyecto en Drive.")
+            st.success(f"Se han generado y guardado {total_apartados} documento(s) en 'Documentos aplicación'.")
 
     st.markdown("---")
     st.button("← Volver a la revisión de índice", on_click=go_to_phase1_results)
