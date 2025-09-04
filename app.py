@@ -818,6 +818,27 @@ def phase_1_results_page():
 
                     except Exception as e:
                         st.error(f"Ocurrió un error al guardar el índice: {e}")
+
+def phase_2_page():
+    """Página para la generación granular de contenido para cada subapartado."""
+    st.markdown("<h3>FASE 2: Generación de Contenido por Apartados</h3>", unsafe_allow_html=True)
+    st.markdown("Selecciona los apartados para los que quieres generar contenido. Puedes adjuntar documentación de apoyo para cada uno.")
+    st.markdown("---")
+
+    # Verificamos que tenemos un índice con el que trabajar
+    if 'generated_structure' not in st.session_state or not st.session_state.generated_structure:
+        st.warning("No se ha cargado ninguna estructura de índice. Por favor, vuelve a la Fase 1.")
+        if st.button("Ir a Fase 1"):
+            go_to_phase1()
+            st.rerun()
+        return
+
+    # Aquí es donde construiremos la nueva interfaz.
+    # Por ahora, un mensaje temporal.
+    st.info("Próximamente: Aquí aparecerá la lista de subapartados con checkboxes y file uploaders.")
+
+    st.markdown("---")
+    st.button("← Volver a la revisión de índice", on_click=go_to_phase1_results)
 # =============================================================================
 
 #                        LÓGICA PRINCIPAL (ROUTER) - VERSIÓN CORRECTA
