@@ -901,131 +901,82 @@ def phase_1_results_page():
 # =============================================================================
 #           VERSIÓN FINAL de phase_2_page (guarda docs de apoyo)
 # =============================================================================
+# =============================================================================
+#           VERSIÓN AVANZADA de phase_2_page (CON ESTADOS Y RE-GENERACIÓN)
+# =============================================================================
 def phase_2_page():
-    """Página de generación granular que guarda los documentos de apoyo en 'Contexto empresa'."""
-    st.markdown("<h3>FASE 2: Generación de Contenido por Apartados</h3>", unsafe_allow_html=True)
-    st.markdown("Selecciona los apartados para los que quieres generar contenido. Puedes adjuntar documentación de apoyo para cada uno.")
+    """Centro de mando para la generación y re-generación de guiones."""
+    st.markdown("<h3>FASE 2: Centro de Mando de Guiones</h3>", unsafe_allow_html=True)
+    st.markdown("Genera los borradores iniciales, revísalos en Drive y luego re-genéralos con el feedback incorporado.")
     st.markdown("---")
 
-    if 'generated_structure' not in st.session_state or not st.session_state.generated_structure:
-        st.warning("No se ha cargado ninguna estructura de índice. Por favor, vuelve a la Fase 1.")
+    # --- SETUP INICIAL ---
+    if 'generated_structure' not in st.session_state:
+        st.warning("No se ha cargado un índice. Volviendo a Fase 1.")
         if st.button("Ir a Fase 1"): go_to_phase1(); st.rerun()
         return
 
+    service = st.session_state.drive_service
+    project_folder_id = st.session_state.selected_project['id']
     matices = st.session_state.generated_structure.get('matices_desarrollo', [])
     
-    if 'selected_subapartados' not in st.session_state:
-        st.session_state.selected_subapartados = {item.get('subapartado'): False for item in matices}
-    if 'extra_docs' not in st.session_state:
-        st.session_state.extra_docs = {}
-
-    with st.form("generacion_guiones_form"):
-        st.subheader("Selección de Apartados")
+    # --- BUSCAR CARPETAS Y ARCHIVOS ---
+    with st.spinner("Sincronizando con Google Drive..."):
+        pliegos_folder_id = find_or_create_folder(service, "Pliegos", parent_id=project_folder_id)
+        guiones_folder_id = find_or_create_folder(service, "Guiones de Subapartados", parent_id=project_folder_id)
         
-        for i, item in enumerate(matices):
-            subapartado_titulo = item.get('subapartado')
-            if not subapartado_titulo: continue
+        pliegos_en_drive = get_files_in_project(service, pliegos_folder_id)
+        guiones_en_drive = get_files_in_project(service, guiones_folder_id)
+        nombres_guiones_existentes = [f['name'] for f in guiones_en_drive]
 
-            col1, col2, col3 = st.columns([0.5, 4, 3])
+    # --- INTERFAZ DE GESTIÓN DE GUIONES ---
+    st.subheader("Gestión de Guiones de Subapartados")
+
+    for i, item in enumerate(matices):
+        subapartado_titulo = item.get('subapartado')
+        if not subapartado_titulo: continue
+        
+        nombre_archivo_esperado = re.sub(r'[\\/*?:"<>|]', "", subapartado_titulo) + ".docx"
+        
+        # Determinamos el estado del guion
+        estado = "⚪ No Generado"
+        if nombre_archivo_esperado in nombres_guiones_existentes:
+            estado = "📄 Generado"
+            file_info = next((f for f in guiones_en_drive if f['name'] == nombre_archivo_esperado), None)
             
+        with st.container(border=True):
+            col1, col2, col3 = st.columns([4, 1, 2])
             with col1:
-                st.checkbox("", key=f"check_{subapartado_titulo}")
-            with col2:
                 st.write(f"**{subapartado_titulo}**")
+                st.caption(f"Estado: {estado}")
+            
+            with col2:
+                if estado == "📄 Generado":
+                    link = f"https://docs.google.com/document/d/{file_info['id']}/edit"
+                    st.link_button("Revisar en Drive", link)
+            
             with col3:
-                st.file_uploader("Aportar documentación extra", type=['pdf', 'docx', 'txt'], key=f"upload_{subapartado_titulo}", label_visibility="collapsed")
+                # --- Lógica de los botones de acción ---
+                if estado == "⚪ No Generado":
+                    if st.button("Generar Borrador", key=f"gen_{i}", use_container_width=True):
+                        # (Aquí iría la lógica de la generación inicial que ya teníamos)
+                        st.info("Lógica de generación inicial pendiente de conectar.")
 
-        submitted = st.form_submit_button("Generar Guion(es) para los Apartados Seleccionados", type="primary")
-
-    if submitted:
-        # Recogemos los valores del formulario
-        for item in matices:
-            titulo = item.get('subapartado')
-            if titulo:
-                st.session_state.selected_subapartados[titulo] = st.session_state[f"check_{titulo}"]
-                st.session_state.extra_docs[titulo] = st.session_state[f"upload_{titulo}"]
-
-        apartados_a_generar = [titulo for titulo, seleccionado in st.session_state.selected_subapartados.items() if seleccionado]
-
-        if not apartados_a_generar:
-            st.warning("Por favor, selecciona al menos un apartado para generar.")
-        else:
-            service = st.session_state.drive_service
-            project_folder_id = st.session_state.selected_project['id']
-            
-            # Buscamos o creamos las carpetas necesarias
-            guiones_folder_id = find_or_create_folder(service, "Guiones de Subapartados", parent_id=project_folder_id)
-            pliegos_folder_id = find_or_create_folder(service, "Pliegos", parent_id=project_folder_id)
-            
-            # --- !! COMIENZO DEL CAMBIO !! ---
-            # Buscamos o creamos la carpeta 'Contexto empresa'
-            contexto_folder_id = find_or_create_folder(service, "Contexto empresa", parent_id=project_folder_id)
-            # --- !! FIN DEL CAMBIO !! ---
-
-            total_apartados = len(apartados_a_generar)
-            st.info(f"Iniciando la generación de {total_apartados} documento(s)...")
-            
-            progress_bar = st.progress(0, text="Iniciando...")
-            
-            pliegos_ia = []
-            with st.spinner("Cargando pliegos de contexto..."):
-                pliegos_en_drive = get_files_in_project(service, pliegos_folder_id)
-                for file_info in pliegos_en_drive:
-                    file_content_bytes = download_file_from_drive(service, file_info['id'])
-                    pliegos_ia.append({"mime_type": file_info['mimeType'], "data": file_content_bytes.getvalue()})
-
-            for idx, titulo in enumerate(apartados_a_generar):
-                progress_text = f"Generando: {titulo} ({idx+1}/{total_apartados})"
-                progress_bar.progress((idx) / total_apartados, text=progress_text)
-                
-                with st.spinner(progress_text):
-                    try:
-                        nombre_archivo_limpio = re.sub(r'[\\/*?:"<>|]', "", titulo) + ".docx"
-                        indicaciones = next((item for item in matices if item['subapartado'] == titulo), None)
-                        
-                        contenido_ia = [PROMPT_PREGUNTAS_TECNICAS_INDIVIDUAL]
-                        contenido_ia.append("--- INDICACIONES PARA ESTE APARTADO ---\n" + json.dumps(indicaciones, indent=2))
-                        contenido_ia.extend(pliegos_ia)
-
-                        doc_extra = st.session_state.extra_docs.get(titulo)
-                        if doc_extra:
-                            contenido_ia.append("--- DOCUMENTACIÓN DE APOYO ADICIONAL ---\n")
-                            contenido_ia.append({"mime_type": doc_extra.type, "data": doc_extra.getvalue()})
-                            
-                            # --- !! OTRO CAMBIO !! ---
-                            # Guardamos el archivo de apoyo en la carpeta 'Contexto empresa'
-                            # (Buscamos si ya existe para reemplazarlo y no duplicar)
-                            existing_support_doc_id = find_file_by_name(service, doc_extra.name, contexto_folder_id)
-                            if existing_support_doc_id:
-                                delete_file_from_drive(service, existing_support_doc_id)
-                            upload_file_to_drive(service, doc_extra, contexto_folder_id)
-                            # --- !! FIN DEL CAMBIO !! ---
-
-                        response = model.generate_content(contenido_ia)
-                        
-                        documento = docx.Document()
-                        agregar_markdown_a_word(documento, response.text)
-                        
-                        doc_io = io.BytesIO()
-                        documento.save(doc_io)
-                        
-                        word_file_obj = io.BytesIO(doc_io.getvalue())
-                        word_file_obj.name = nombre_archivo_limpio
-                        word_file_obj.type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                        
-                        existing_file_id = find_file_by_name(service, nombre_archivo_limpio, guiones_folder_id)
-                        if existing_file_id:
-                            delete_file_from_drive(service, existing_file_id)
-                        upload_file_to_drive(service, word_file_obj, guiones_folder_id)
-
-                    except Exception as e:
-                        st.error(f"Error al generar '{titulo}': {e}")
-            
-            progress_bar.progress(1.0, text="¡Proceso completado!")
-            st.success(f"Se han generado y guardado {total_apartados} documento(s) en 'Guiones de Subapartados'.")
+                elif estado == "📄 Generado":
+                    if st.button("Re-Generar con Feedback", key=f"regen_{i}", type="primary", use_container_width=True):
+                        # (Aquí irá la lógica de re-generación con el nuevo prompt)
+                        st.info("Lógica de re-generación pendiente de conectar.")
 
     st.markdown("---")
-    st.button("← Volver a la revisión de índice", on_click=go_to_phase1_results)
+    # Botones de navegación al final de la página
+    col_nav1, col_nav2, col_nav3 = st.columns(3)
+    with col_nav1:
+        st.button("← Volver a Revisión de Índice (F1)", on_click=go_to_phase1_results, use_container_width=True)
+    with col_nav2:
+        # Placeholder para un botón de "Generar todos"
+        st.button("Generar Todos los Borradores", disabled=True, use_container_width=True)
+    with col_nav3:
+        st.button("Ir a Plan de Prompts (F3) →", on_click=go_to_phase3, use_container_width=True)
 # =============================================================================
 
 #                        LÓGICA PRINCIPAL (ROUTER) - VERSIÓN CORRECTA
