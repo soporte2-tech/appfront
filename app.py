@@ -10,6 +10,12 @@ from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from googleapiclient.http import MediaIoBaseUpload, MediaIoBaseDownload
+import base64
+from email.mime.text import MIMEText
+# Y asegúrate también de que estas de antes siguen ahí:
+import time
+import httplib2
+import google_auth_httplib2 
 
 # =============================================================================
 #           BLOQUE COMPLETO DE CONFIGURACIÓN Y FUNCIONES DE DRIVE
@@ -96,6 +102,49 @@ def find_file_by_name(service, file_name, folder_id):
     response = service.files().list(q=query, spaces='drive', fields='files(id)').execute()
     files = response.get('files', [])
     return files[0]['id'] if files else None
+    
+def send_gmail_notification(credentials, file_name, file_drive_link, user_email):
+    """Envía una notificación por Gmail cuando un archivo está listo."""
+    try:
+        # Construimos el servicio de Gmail
+        gmail_service = build('gmail', 'v1', credentials=credentials)
+        
+        # Obtenemos la información del usuario para personalizar el email
+        oauth2_service = build('oauth2', 'v2', credentials=credentials)
+        user_info = oauth2_service.userinfo().get().execute()
+        user_name = user_info.get('given_name', 'Usuario') # Usamos el nombre de pila o 'Usuario' por defecto
+
+        message = MIMEText(
+            f"""
+            <p>¡Hola, {user_name}!</p>
+            <p>El guion estratégico para tu proyecto <b>"{file_name}"</b> ha sido generado con éxito.</p>
+            <p>Puedes acceder a él, editarlo y compartirlo desde el siguiente enlace a Google Drive:</p>
+            <p style="text-align: center; margin: 20px 0;">
+                <a href="{file_drive_link}" style="font-size: 16px; font-weight: bold; color: #ffffff; background-color: #4285F4; padding: 12px 24px; border-radius: 5px; text-decoration: none;">
+                    Abrir Guion en Google Drive
+                </a>
+            </p>
+            <br>
+            <p>¡Un saludo!</p>
+            <p><em>Tu Asistente de Licitaciones AI</em></p>
+            """,
+            'html'
+        )
+        
+        message['to'] = user_email
+        message['from'] = "me" # "me" es un alias para la cuenta autenticada
+        message['subject'] = f"✅ Tu Guion Estratégico para '{file_name}' está listo"
+        
+        raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
+        body = {'raw': raw_message}
+        
+        gmail_service.users().messages().send(userId='me', body=body).execute()
+        st.toast("📧 Notificación por email enviada con éxito.")
+    
+    except HttpError as error:
+        st.warning(f"No se pudo enviar la notificación por email: {error}.")
+    except Exception as e:
+        st.error(f"Ocurrió un error inesperado al enviar el email: {e}")
     
 # --- CONFIGURACIÓN DE LA PÁGINA ---
 st.set_page_config(page_title="Asistente de Licitaciones AI", layout="wide", initial_sidebar_state="collapsed")
@@ -645,8 +694,12 @@ def phase_1_page():
 #           VERSIÓN FINAL Y COMPLETA DE phase_1_results_page()
 # =============================================================================
 
+# =============================================================================
+#           VERSIÓN FINAL Y COMPLETA DE phase_1_results_page CON NOTIFICACIÓN
+# =============================================================================
+
 def phase_1_results_page():
-    """Página para revisar, regenerar, aceptar y guardar los resultados en Drive."""
+    """Página para revisar, regenerar, aceptar, guardar y notificar por email."""
     st.markdown("<h3>FASE 1: Revisión de Resultados</h3>", unsafe_allow_html=True)
     st.markdown("Revisa el índice. Si es correcto, genera y guarda el guion. Si no, pide los cambios que necesites.")
     st.markdown("---")
@@ -697,7 +750,7 @@ def phase_1_results_page():
         st.markdown("---")
         st.subheader("Validación y Siguiente Paso")
         
-        st.text_area("Si necesitas cambios, indícalos aquí:", key="feedback_area", placeholder="Ej: 'Une los apartados 1.1 y 1.2 en uno solo que hable del contexto general.'")
+        st.text_area("Si necesitas cambios, indícalos aquí:", key="feedback_area", placeholder="Ej: 'Une los apartados 1.1 y 1.2 en uno solo.'")
         
         col_val_1, col_val_2 = st.columns(2)
         with col_val_1:
@@ -710,7 +763,7 @@ def phase_1_results_page():
 
         with col_val_2:
             if st.button("Aceptar y Generar Guion →", type="primary", use_container_width=True):
-                with st.spinner("Guardando índice final y creando el guion..."):
+                with st.spinner("Guardando índice, creando guion y enviando notificación..."):
                     try:
                         service = st.session_state.drive_service
                         project_folder_id = st.session_state.selected_project['id']
@@ -762,8 +815,20 @@ def phase_1_results_page():
                             delete_file_from_drive(service, saved_guion_id)
                         upload_file_to_drive(service, word_file_obj, docs_app_folder_id)
                         
-                        st.success("¡Guion Estratégico generado y guardado en 'Documentos aplicación'!")
-                    
+                        st.success("¡Guion Estratégico generado y guardado!")
+
+                        # --- ENVIAR NOTIFICACIÓN POR EMAIL ---
+                        guion_id = find_file_by_name(service, "guion_estrategico.docx", docs_app_folder_id)
+                        if guion_id:
+                            oauth2_service = build('oauth2', 'v2', credentials=st.session_state.credentials)
+                            user_info = oauth2_service.userinfo().get().execute()
+                            user_email = user_info.get('email')
+                            
+                            file_drive_link = f"https://docs.google.com/document/d/{guion_id}/edit"
+                            project_name = st.session_state.selected_project['name']
+                            
+                            send_gmail_notification(st.session_state.credentials, project_name, file_drive_link, user_email)
+                        
                     except Exception as e:
                         st.error(f"Ocurrió un error al generar el guion: {e}")
 
