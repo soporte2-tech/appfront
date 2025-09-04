@@ -871,8 +871,11 @@ def phase_1_results_page():
 # =============================================================================
 #           VERSIÓN FINAL Y COMPLETA de phase_2_page (con la carpeta corregida)
 # =============================================================================
+# =============================================================================
+#           VERSIÓN FINAL de phase_2_page (guarda docs de apoyo)
+# =============================================================================
 def phase_2_page():
-    """Página para la generación granular de contenido, guardando en la carpeta raíz del proyecto."""
+    """Página de generación granular que guarda los documentos de apoyo en 'Contexto empresa'."""
     st.markdown("<h3>FASE 2: Generación de Contenido por Apartados</h3>", unsafe_allow_html=True)
     st.markdown("Selecciona los apartados para los que quieres generar contenido. Puedes adjuntar documentación de apoyo para cada uno.")
     st.markdown("---")
@@ -899,7 +902,7 @@ def phase_2_page():
             col1, col2, col3 = st.columns([0.5, 4, 3])
             
             with col1:
-                st.checkbox("", key=f"check_{subapartado_titulo}", value=st.session_state.selected_subapartados.get(subapartado_titulo, False))
+                st.checkbox("", key=f"check_{subapartado_titulo}")
             with col2:
                 st.write(f"**{subapartado_titulo}**")
             with col3:
@@ -908,6 +911,7 @@ def phase_2_page():
         submitted = st.form_submit_button("Generar Guion(es) para los Apartados Seleccionados", type="primary")
 
     if submitted:
+        # Recogemos los valores del formulario
         for item in matices:
             titulo = item.get('subapartado')
             if titulo:
@@ -923,13 +927,14 @@ def phase_2_page():
             project_folder_id = st.session_state.selected_project['id']
             
             # Buscamos o creamos las carpetas necesarias
-            docs_app_folder_id = find_or_create_folder(service, "Documentos aplicación", parent_id=project_folder_id)
-            # --- !! ESTE ES EL CAMBIO !! ---
-            # Ahora la carpeta de guiones se crea en la raíz del proyecto.
             guiones_folder_id = find_or_create_folder(service, "Guiones de Subapartados", parent_id=project_folder_id)
-            # --- !! FIN DEL CAMBIO !! ---
             pliegos_folder_id = find_or_create_folder(service, "Pliegos", parent_id=project_folder_id)
             
+            # --- !! COMIENZO DEL CAMBIO !! ---
+            # Buscamos o creamos la carpeta 'Contexto empresa'
+            contexto_folder_id = find_or_create_folder(service, "Contexto empresa", parent_id=project_folder_id)
+            # --- !! FIN DEL CAMBIO !! ---
+
             total_apartados = len(apartados_a_generar)
             st.info(f"Iniciando la generación de {total_apartados} documento(s)...")
             
@@ -949,7 +954,6 @@ def phase_2_page():
                 with st.spinner(progress_text):
                     try:
                         nombre_archivo_limpio = re.sub(r'[\\/*?:"<>|]', "", titulo) + ".docx"
-
                         indicaciones = next((item for item in matices if item['subapartado'] == titulo), None)
                         
                         contenido_ia = [PROMPT_PREGUNTAS_TECNICAS_INDIVIDUAL]
@@ -960,6 +964,15 @@ def phase_2_page():
                         if doc_extra:
                             contenido_ia.append("--- DOCUMENTACIÓN DE APOYO ADICIONAL ---\n")
                             contenido_ia.append({"mime_type": doc_extra.type, "data": doc_extra.getvalue()})
+                            
+                            # --- !! OTRO CAMBIO !! ---
+                            # Guardamos el archivo de apoyo en la carpeta 'Contexto empresa'
+                            # (Buscamos si ya existe para reemplazarlo y no duplicar)
+                            existing_support_doc_id = find_file_by_name(service, doc_extra.name, contexto_folder_id)
+                            if existing_support_doc_id:
+                                delete_file_from_drive(service, existing_support_doc_id)
+                            upload_file_to_drive(service, doc_extra, contexto_folder_id)
+                            # --- !! FIN DEL CAMBIO !! ---
 
                         response = model.generate_content(contenido_ia)
                         
