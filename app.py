@@ -9,6 +9,7 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
+from google.auth.transport.requests import Request
 from googleapiclient.http import MediaIoBaseUpload, MediaIoBaseDownload
 import base64
 from email.mime.text import MIMEText
@@ -364,13 +365,33 @@ def get_google_flow():
     )
 
 def get_credentials():
-    """Obtiene las credenciales del usuario desde el session_state o inicia el flujo OAuth."""
+    """Obtiene las credenciales, forzando un nuevo login si los scopes han cambiado."""
+    
+    # --- !! ESTA ES LA NUEVA LÓGICA DE COMPROBACIÓN !! ---
     if 'credentials' in st.session_state and st.session_state.credentials:
-        # Check if token is expired. Refresh if it is.
+        creds = st.session_state.credentials
+        # Comprobamos si todos los scopes que necesitamos están en las credenciales guardadas.
+        if not all(scope in creds.scopes for scope in SCOPES):
+            # Si faltan scopes, las credenciales no son válidas. Las borramos.
+            del st.session_state.credentials
+            # Forzamos al usuario a la página de inicio para que se loguee de nuevo.
+            go_to_landing()
+            st.rerun() # Detenemos la ejecución actual y recargamos
+    # --- !! FIN DE LA NUEVA LÓGICA !! ---
+
+    if 'credentials' in st.session_state and st.session_state.credentials:
         creds = st.session_state.credentials
         if creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-            st.session_state.credentials = creds
+            try:
+                # Necesitamos importar Request de google.auth.transport.requests
+                from google.auth.transport.requests import Request
+                creds.refresh(Request())
+                st.session_state.credentials = creds
+            except Exception as e:
+                # Si el refresh token falla (p.ej. ha sido revocado), borramos credenciales
+                del st.session_state.credentials
+                go_to_landing()
+                st.rerun()
         return creds
 
     if 'code' in st.query_params:
@@ -378,13 +399,20 @@ def get_credentials():
             flow = get_google_flow()
             flow.fetch_token(code=st.query_params['code'])
             st.session_state.credentials = flow.credentials
+            # Limpiamos los parámetros de la URL para evitar bucles
             st.query_params.clear()
-            st.rerun() # Rerun to clear the code from URL and update the state
+            st.rerun()
         except Exception as e:
+            # Si hay un error (como 'scope has changed'), lo mostramos y limpiamos el estado.
             st.error(f"Error al obtener el token: {e}")
-            return None
+            if 'credentials' in st.session_state:
+                del st.session_state.credentials
+            # Damos la opción de reintentar
+            st.button("Reintentar inicio de sesión")
+            st.stop() # Detenemos la ejecución para que no continúe con error
+            
     return None
-
+    
 def build_drive_service(credentials):
     """Construye y devuelve el objeto de servicio de la API de Drive."""
     try:
