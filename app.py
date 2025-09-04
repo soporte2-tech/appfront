@@ -868,6 +868,9 @@ def phase_1_results_page():
 # =============================================================================
 #           VERSIÓN FINAL de phase_2_page CON SUB-CARPETA PARA GUIONES
 # =============================================================================
+# =============================================================================
+#           VERSIÓN FINAL Y COMPLETA de phase_2_page (con la carpeta corregida)
+# =============================================================================
 def phase_2_page():
     """Página para la generación granular de contenido, guardando en la carpeta raíz del proyecto."""
     st.markdown("<h3>FASE 2: Generación de Contenido por Apartados</h3>", unsafe_allow_html=True)
