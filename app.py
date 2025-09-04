@@ -819,23 +819,129 @@ def phase_1_results_page():
                     except Exception as e:
                         st.error(f"Ocurrió un error al guardar el índice: {e}")
 
+# =============================================================================
+#           REEMPLAZA phase_2_page() POR ESTA VERSIÓN COMPLETA
+# =============================================================================
+
 def phase_2_page():
     """Página para la generación granular de contenido para cada subapartado."""
     st.markdown("<h3>FASE 2: Generación de Contenido por Apartados</h3>", unsafe_allow_html=True)
     st.markdown("Selecciona los apartados para los que quieres generar contenido. Puedes adjuntar documentación de apoyo para cada uno.")
     st.markdown("---")
 
-    # Verificamos que tenemos un índice con el que trabajar
     if 'generated_structure' not in st.session_state or not st.session_state.generated_structure:
         st.warning("No se ha cargado ninguna estructura de índice. Por favor, vuelve a la Fase 1.")
-        if st.button("Ir a Fase 1"):
-            go_to_phase1()
-            st.rerun()
+        if st.button("Ir a Fase 1"): go_to_phase1(); st.rerun()
         return
 
-    # Aquí es donde construiremos la nueva interfaz.
-    # Por ahora, un mensaje temporal.
-    st.info("Próximamente: Aquí aparecerá la lista de subapartados con checkboxes y file uploaders.")
+    # Extraemos la lista plana de subapartados del índice
+    matices = st.session_state.generated_structure.get('matices_desarrollo', [])
+    
+    # Usaremos el session_state para mantener la selección y los archivos subidos
+    if 'selected_subapartados' not in st.session_state:
+        st.session_state.selected_subapartados = {}
+    if 'extra_docs' not in st.session_state:
+        st.session_state.extra_docs = {}
+
+    # Creamos el formulario para que todos los widgets se envíen juntos
+    with st.form("generacion_guiones_form"):
+        st.subheader("Selección de Apartados")
+        
+        for i, item in enumerate(matices):
+            subapartado_titulo = item.get('subapartado', f'Apartado sin título {i+1}')
+            
+            # Usamos columnas para alinear checkbox, título y file_uploader
+            col1, col2, col3 = st.columns([0.5, 4, 3])
+            
+            with col1:
+                # El valor del checkbox se guarda en session_state
+                st.session_state.selected_subapartados[subapartado_titulo] = st.checkbox("", key=f"check_{i}")
+            with col2:
+                st.write(f"**{subapartado_titulo}**")
+            with col3:
+                # El file_uploader también se guarda en session_state
+                st.session_state.extra_docs[subapartado_titulo] = st.file_uploader(
+                    "Aportar documentación extra", 
+                    type=['pdf', 'docx', 'txt'], 
+                    key=f"upload_{i}",
+                    label_visibility="collapsed"
+                )
+
+        st.markdown("---")
+        # El botón de envío del formulario
+        submitted = st.form_submit_button("Generar Guion(es) para los Apartados Seleccionados", type="primary")
+
+    if submitted:
+        apartados_a_generar = [
+            titulo for titulo, seleccionado in st.session_state.selected_subapartados.items() if seleccionado
+        ]
+
+        if not apartados_a_generar:
+            st.warning("Por favor, selecciona al menos un apartado para generar.")
+        else:
+            service = st.session_state.drive_service
+            project_folder_id = st.session_state.selected_project['id']
+            docs_app_folder_id = find_or_crear_carpeta(servicio, "Documentos aplicación", parent_id=project_folder_id)
+
+            total_apartados = len(apartados_a_generar)
+            st.info(f"Iniciando la generación de {total_apartados} documento(s)...")
+            
+            progress_bar = st.progress(0, text="Iniciando...")
+
+            for idx, titulo in enumerate(apartados_a_generar):
+                progress_text = f"Generando contenido para: **{titulo}** ({idx+1}/{total_apartados})"
+                progress_bar.progress((idx) / total_apartados, text=progress_text)
+                
+                with st.spinner(progress_text):
+                    try:
+                        # Buscamos las indicaciones para este apartado
+                        indicaciones = next((item for item in matices if item['subapartado'] == titulo), None)
+                        
+                        contenido_ia = [PROMPT_GUION_INDIVIDUAL]
+                        contenido_ia.append(json.dumps(indicaciones, indent=2))
+                        
+                        # Añadimos los pliegos originales para dar contexto
+                        if st.session_state.get('uploaded_pliegos'):
+                            for file_info in st.session_state.uploaded_pliegos:
+                                file_content_bytes = download_file_from_drive(service, file_info['id'])
+                                contenido_ia.append({"mime_type": file_info['mimeType'], "data": file_content_bytes.getvalue()})
+
+                        # Añadimos el documento de apoyo si existe
+                        doc_extra = st.session_state.extra_docs.get(titulo)
+                        if doc_extra:
+                            contenido_ia.append({"mime_type": doc_extra.type, "data": doc_extra.getvalue()})
+
+                        # Llamada a la IA
+                        response = model.generate_content(contenido_ia)
+                        
+                        # Creamos y guardamos el documento Word
+                        documento = docx.Document()
+                        documento.add_heading(titulo, level=1)
+                        agregar_markdown_a_word(documento, response.text)
+                        
+                        doc_io = io.BytesIO()
+                        documento.save(doc_io)
+                        doc_io.seek(0)
+                        
+                        # Creamos un objeto de archivo para subir a Drive
+                        word_file_obj = io.BytesIO(doc_io.getvalue())
+                        # Limpiamos el nombre del archivo para que sea válido
+                        nombre_archivo_limpio = re.sub(r'[\\/*?:"<>|]', "", titulo) + ".docx"
+                        word_file_obj.name = nombre_archivo_limpio
+                        word_file_obj.type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                        
+                        # Reemplazamos si ya existía
+                        existing_file_id = find_file_by_name(service, nombre_archivo_limpio, docs_app_folder_id)
+                        if existing_file_id:
+                            delete_file_from_drive(service, existing_file_id)
+                        
+                        upload_file_to_drive(service, word_file_obj, docs_app_folder_id)
+
+                    except Exception as e:
+                        st.error(f"Ocurrió un error al generar el guion para '{titulo}': {e}")
+            
+            progress_bar.progress(1.0, text="¡Proceso completado!")
+            st.success(f"Se han generado y guardado {total_apartados} documento(s) en la carpeta 'Documentos aplicación' de tu proyecto en Drive.")
 
     st.markdown("---")
     st.button("← Volver a la revisión de índice", on_click=go_to_phase1_results)
