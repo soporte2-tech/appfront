@@ -731,7 +731,7 @@ def phase_1_results_page():
                         st.toast("Índice final guardado en 'Documentos aplicación'.")
 
                         # Generamos el guion
-                        contenido_ia_preguntas = [PROMPT_PREGŪNTAS_TECNICAS]
+                        contenido_ia_preguntas = [PROMPT_PREGUNTAS_TECNICAS]
                         contenido_ia_preguntas.append("--- ESTRUCTURA VALIDADA (JSON) ---\n" + json.dumps(st.session_state.generated_structure, indent=2))
                         if st.session_state.get('uploaded_pliegos'):
                             for file_info in st.session_state.uploaded_pliegos:
