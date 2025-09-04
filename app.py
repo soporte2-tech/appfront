@@ -205,6 +205,25 @@ Te proporcionaré DOS elementos clave:
 1.  El texto completo de los documentos base (Pliegos y/o plantilla).
 2.  La estructura que se ha generado en el mensaje anterior con los apartados y las anotaciones.
 """
+
+PROMPT_REGENERACION = """
+Actúas como un editor experto que refina una estructura JSON para una memoria técnica.
+Te proporcionaré TRES elementos clave:
+1.  Los documentos originales (Pliegos y/o plantilla).
+2.  La estructura JSON que se generó en un primer intento.
+3.  Las INSTRUCCIONES DE UN USUARIO con los cambios que desea.
+
+Tu única tarea es generar una **NUEVA VERSIÓN MEJORADA** del objeto JSON que incorpore a la perfección los cambios solicitados por el usuario.
+
+## REGLAS OBLIGATORIAS:
+-   **MANTÉN TODAS LAS REGLAS DEL PROMPT ORIGINAL:** El formato de salida debe seguir siendo un JSON válido con las claves "estructura_memoria" y "matices_desarrollo", la numeración debe ser correcta (1, 1.1, etc.), y las indicaciones deben ser detalladas.
+-   **INCORPORA EL FEEDBACK:** Lee atentamente las instrucciones del usuario y aplícalas a la nueva estructura. Por ejemplo, si pide "une los apartados 1.1 y 1.2", debes hacerlo. Si pide "el apartado 2 debe hablar sobre la experiencia del equipo", debes modificar las indicaciones de ese apartado.
+-   **NO PIERDAS INFORMACIÓN:** Si el usuario solo pide cambiar el apartado 3, los apartados 1, 2, 4, etc., deben permanecer intactos en la nueva versión.
+-   **SÉ PRECISO:** No inventes nuevos apartados a menos que el usuario te lo pida explícitamente. Céntrate únicamente en aplicar las correcciones solicitadas.
+
+Genera únicamente el objeto JSON corregido. No incluyas ningún texto fuera de él.
+"""
+
 # =============================================================================
 #              NUEVAS FUNCIONES: AUTENTICACIÓN Y GOOGLE DRIVE
 # =============================================================================
@@ -440,118 +459,71 @@ def project_selection_page():
                     go_to_phase1()
                     st.rerun()
 
-def phase_1_page():
-    """Página para la carga de documentos de la Fase 1, ahora vinculada a un proyecto."""
-    # Verificamos que hemos llegado aquí con un proyecto seleccionado
-    if not st.session_state.get('selected_project'):
-        st.warning("No se ha seleccionado ningún proyecto. Volviendo a la selección.")
-        go_to_project_selection()
-        st.rerun()
-
-    project_name = st.session_state.selected_project['name']
-    st.markdown(f"<h3>FASE 1: Análisis y Estructura</h3>", unsafe_allow_html=True)
-    st.info(f"Estás trabajando en el proyecto: **{project_name}**")
-    st.markdown("Carga los documentos base para que la IA genere la estructura de la memoria técnica.")
-    st.markdown("---")
-    
-    # Aquí puedes añadir la lógica para ver los archivos existentes en Drive si lo deseas.
-    # Por ahora, mantenemos la lógica de subida de archivos original para no complicarlo más.
-    
-    with st.container(border=True):
-        st.subheader("PASO 1: Carga de Documentos")
-        has_template = st.radio("¿Dispones de una plantilla?", ("No", "Sí"), horizontal=True, key="template_radio")
-        
-        # Usamos variables locales para los uploaders para evitar conflictos de estado
-        uploaded_template = None
-        if has_template == 'Sí':
-            uploaded_template = st.file_uploader("Sube tu plantilla (DOCX/PDF)", type=['docx', 'pdf'], key="template_uploader")
-        
-        uploaded_pliegos = st.file_uploader("Sube los Pliegos (DOCX/PDF)", type=['docx', 'pdf'], accept_multiple_files=True, key="pliegos_uploader")
-
-    st.write("")
-    if st.button("Generar Estructura", type="primary", use_container_width=True):
-        if not uploaded_pliegos:
-            st.warning("Por favor, sube al menos un archivo de Pliegos.")
-        else:
-            # Esta es tu lógica original de llamada a la IA, que sigue siendo válida.
-            with st.spinner("🧠 Analizando documentos y generando la estructura..."):
-                try:
-                    # (Aquí va tu código original para llamar a la IA... es idéntico al que tenías)
-                    contenido_ia = []
-                    texto_plantilla = ""
-                    if has_template == 'Sí' and uploaded_template is not None:
-                        prompt_a_usar = PROMPT_PLANTILLA
-                        if uploaded_template.name.endswith('.docx'):
-                            doc = docx.Document(uploaded_template)
-                            texto_plantilla = "\n".join([p.text for p in doc.paragraphs])
-                        elif uploaded_template.name.endswith('.pdf'):
-                            reader = PdfReader(uploaded_template)
-                            texto_plantilla = "\n".join([page.extract_text() for page in reader.pages])
-                    else:
-                        prompt_a_usar = PROMPT_PLIEGOS
-
-                    contenido_ia.append(prompt_a_usar)
-                    if texto_plantilla:
-                        contenido_ia.append(texto_plantilla)
-                    
-                    # Guardamos los archivos subidos en session_state para usarlos en la página de resultados
-                    st.session_state.uploaded_pliegos = uploaded_pliegos
-                    st.session_state.uploaded_template = uploaded_template
-
-                    for pliego in uploaded_pliegos:
-                        contenido_ia.append({"mime_type": pliego.type, "data": pliego.getvalue()})
-
-                    generation_config = genai.GenerationConfig(response_mime_type="application/json")
-                    response = model.generate_content(contenido_ia, generation_config=generation_config)
-                    
-                    json_limpio_str = limpiar_respuesta_json(response.text)
-                    if json_limpio_str:
-                        try:
-                            informacion_estructurada = json.loads(json_limpio_str)
-                            st.session_state.generated_structure = informacion_estructurada
-                            go_to_phase1_results()
-                            st.rerun()
-                        except json.JSONDecodeError as json_error:
-                            st.error(f"Error de formato JSON: {json_error}")
-                            st.text_area("JSON con errores:", json_limpio_str, height=300)
-                    else:
-                        st.error("La IA devolvió una respuesta vacía o no válida.")
-                        st.text_area("Respuesta original de la IA:", response.text, height=200)
-
-                except Exception as e:
-                    st.error(f"Ocurrió un error al contactar con la IA: {e}")
-
-    st.write("")
-    st.markdown("---")
-    st.button("← Volver a Selección de Proyecto", on_click=back_to_project_selection_and_cleanup, use_container_width=True, key="back_to_projects")
-
+# =============================================================================
+#           PÁGINA 4: RESULTADOS FASE 1 (VERSIÓN CON REGENERACIÓN)
+# =============================================================================
 
 def phase_1_results_page():
-    """Página para revisar los resultados de la Fase 1."""
+    """Página para revisar los resultados de la Fase 1, con opción de regenerar."""
     st.markdown("<h3>FASE 1: Revisión de Resultados</h3>", unsafe_allow_html=True)
-    st.markdown("Revisa el índice propuesto por la IA. Si es correcto, genera el guion estratégico.")
+    st.markdown("Revisa el índice propuesto por la IA. Si es correcto, genera el guion. Si no, pide los cambios que necesites.")
     st.markdown("---")
     st.button("← Volver a Cargar Archivos", on_click=go_to_phase1)
 
-    # Verificamos que tenemos datos generados para mostrar
     if 'generated_structure' not in st.session_state or not st.session_state.generated_structure:
-        st.warning("No se ha generado ninguna estructura. Por favor, vuelve a la fase anterior y carga los documentos.")
+        st.warning("No se ha generado ninguna estructura. Por favor, vuelve a la fase anterior.")
         return
 
     with st.container(border=True):
         mostrar_indice_desplegable(st.session_state.generated_structure.get('estructura_memoria'))
         st.markdown("---")
         st.subheader("Validación y Siguiente Paso")
-        feedback = st.text_area("Si necesitas cambios, indícalos aquí (función no implementada aún):", key="feedback_area")
+        feedback = st.text_area("Si necesitas cambios, indícalos aquí:", key="feedback_area", placeholder="Ej: 'El apartado 2. Equipo Técnico debería tener un subapartado para la experiencia y otro para las certificaciones.'")
+        
         col_val_1, col_val_2 = st.columns(2)
         with col_val_1:
-            st.button("Regenerar con Feedback", use_container_width=True, disabled=True)
+            # Habilitamos el botón si el usuario ha escrito algo en el área de feedback
+            if st.button("Regenerar con Feedback", use_container_width=True, disabled=not feedback):
+                
+                # --- LÓGICA DE REGENERACIÓN ---
+                with st.spinner("🧠 Incorporando tu feedback y regenerando la estructura..."):
+                    try:
+                        contenido_ia_regeneracion = [PROMPT_REGENERACION]
+                        contenido_ia_regeneracion.append("--- INSTRUCCIONES DEL USUARIO ---\n" + feedback)
+                        contenido_ia_regeneracion.append("--- ESTRUCTURA JSON ANTERIOR A CORREGIR ---\n" + json.dumps(st.session_state.generated_structure, indent=2))
+                        
+                        # Volvemos a añadir los documentos originales para que la IA tenga todo el contexto
+                        if st.session_state.get('uploaded_pliegos'):
+                            for pliego in st.session_state.uploaded_pliegos:
+                                contenido_ia_regeneracion.append({"mime_type": pliego.type, "data": pliego.getvalue()})
+                        if st.session_state.get('uploaded_template'):
+                            contenido_ia_regeneracion.append({"mime_type": st.session_state.uploaded_template.type, "data": st.session_state.uploaded_template.getvalue()})
+
+                        # Hacemos la llamada a la IA
+                        generation_config = genai.GenerationConfig(response_mime_type="application/json")
+                        response_regeneracion = model.generate_content(contenido_ia_regeneracion, generation_config=generation_config)
+                        
+                        json_limpio_str_regenerado = limpiar_respuesta_json(response_regeneracion.text)
+                        
+                        if json_limpio_str_regenerado:
+                            nueva_estructura = json.loads(json_limpio_str_regenerado)
+                            # Actualizamos la estructura en la memoria de la sesión
+                            st.session_state.generated_structure = nueva_estructura
+                            st.toast("¡Estructura regenerada con éxito!")
+                            # Limpiamos el área de feedback
+                            st.session_state.feedback_area = ""
+                            st.rerun() # Recargamos la página para mostrar el nuevo índice
+                        else:
+                            st.error("La IA no devolvió una estructura válida tras la regeneración.")
+
+                    except Exception as e:
+                        st.error(f"Ocurrió un error durante la regeneración: {e}")
+
         with col_val_2:
             if st.button("Aceptar y Generar Guion →", type="primary", use_container_width=True):
-                # Tu lógica original para generar el guion, que sigue siendo válida
+                # La lógica para generar el guion no cambia
                 with st.spinner("✍️ Creando el guion estratégico..."):
                     try:
-                        # (Aquí va tu código original para llamar a la IA para el guion... es idéntico al que tenías)
                         contenido_ia_preguntas = [PROMPT_PREGUNTAS_TECNICAS]
                         contenido_ia_preguntas.append("--- ESTRUCTURA VALIDADA (JSON) ---\n" + json.dumps(st.session_state.generated_structure, indent=2))
                         if st.session_state.get('uploaded_pliegos'):
@@ -586,6 +558,8 @@ def phase_1_results_page():
                 mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                 use_container_width=True
             )
+
+
 
 # =============================================================================
 #                        LÓGICA PRINCIPAL (ROUTER) - VERSIÓN CORRECTA
