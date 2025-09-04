@@ -548,7 +548,101 @@ def phase_1_page():
     st.markdown("---")
     st.button("← Volver a Selección de Proyecto", on_click=back_to_project_selection_and_cleanup, use_container_width=True, key="back_to_projects")
 
+def phase_1_results_page():
+    """Página para revisar los resultados de la Fase 1, con opción de regenerar."""
+    st.markdown("<h3>FASE 1: Revisión de Resultados</h3>", unsafe_allow_html=True)
+    st.markdown("Revisa el índice propuesto por la IA. Si es correcto, genera el guion. Si no, pide los cambios que necesites.")
+    st.markdown("---")
+    st.button("← Volver a Cargar Archivos", on_click=go_to_phase1)
 
+    if 'generated_structure' not in st.session_state or not st.session_state.generated_structure:
+        st.warning("No se ha generado ninguna estructura. Por favor, vuelve a la fase anterior.")
+        return
+
+    with st.container(border=True):
+        mostrar_indice_desplegable(st.session_state.generated_structure.get('estructura_memoria'))
+        st.markdown("---")
+        st.subheader("Validación y Siguiente Paso")
+        feedback = st.text_area("Si necesitas cambios, indícalos aquí:", key="feedback_area", placeholder="Ej: 'El apartado 2. Equipo Técnico debería tener un subapartado para la experiencia y otro para las certificaciones.'")
+        
+        col_val_1, col_val_2 = st.columns(2)
+        with col_val_1:
+            # Habilitamos el botón si el usuario ha escrito algo en el área de feedback
+            if st.button("Regenerar con Feedback", use_container_width=True, disabled=not feedback):
+                
+                # --- LÓGICA DE REGENERACIÓN ---
+                with st.spinner("🧠 Incorporando tu feedback y regenerando la estructura..."):
+                    try:
+                        contenido_ia_regeneracion = [PROMPT_REGENERACION]
+                        contenido_ia_regeneracion.append("--- INSTRUCCIONES DEL USUARIO ---\n" + feedback)
+                        contenido_ia_regeneracion.append("--- ESTRUCTURA JSON ANTERIOR A CORREGIR ---\n" + json.dumps(st.session_state.generated_structure, indent=2))
+                        
+                        # Volvemos a añadir los documentos originales para que la IA tenga todo el contexto
+                        if st.session_state.get('uploaded_pliegos'):
+                            for pliego in st.session_state.uploaded_pliegos:
+                                contenido_ia_regeneracion.append({"mime_type": pliego.type, "data": pliego.getvalue()})
+                        if st.session_state.get('uploaded_template'):
+                            contenido_ia_regeneracion.append({"mime_type": st.session_state.uploaded_template.type, "data": st.session_state.uploaded_template.getvalue()})
+
+                        # Hacemos la llamada a la IA
+                        generation_config = genai.GenerationConfig(response_mime_type="application/json")
+                        response_regeneracion = model.generate_content(contenido_ia_regeneracion, generation_config=generation_config)
+                        
+                        json_limpio_str_regenerado = limpiar_respuesta_json(response_regeneracion.text)
+                        
+                        if json_limpio_str_regenerado:
+                            nueva_estructura = json.loads(json_limpio_str_regenerado)
+                            # Actualizamos la estructura en la memoria de la sesión
+                            st.session_state.generated_structure = nueva_estructura
+                            st.toast("¡Estructura regenerada con éxito!")
+                            # Limpiamos el área de feedback
+                            st.session_state.feedback_area = ""
+                            st.rerun() # Recargamos la página para mostrar el nuevo índice
+                        else:
+                            st.error("La IA no devolvió una estructura válida tras la regeneración.")
+
+                    except Exception as e:
+                        st.error(f"Ocurrió un error durante la regeneración: {e}")
+
+        with col_val_2:
+            if st.button("Aceptar y Generar Guion →", type="primary", use_container_width=True):
+                # La lógica para generar el guion no cambia
+                with st.spinner("✍️ Creando el guion estratégico..."):
+                    try:
+                        contenido_ia_preguntas = [PROMPT_PREGUNTAS_TECNICAS]
+                        contenido_ia_preguntas.append("--- ESTRUCTURA VALIDADA (JSON) ---\n" + json.dumps(st.session_state.generated_structure, indent=2))
+                        if st.session_state.get('uploaded_pliegos'):
+                            for pliego in st.session_state.uploaded_pliegos:
+                                contenido_ia_preguntas.append({"mime_type": pliego.type, "data": pliego.getvalue()})
+                        if st.session_state.get('uploaded_template'):
+                            contenido_ia_preguntas.append({"mime_type": st.session_state.uploaded_template.type, "data": st.session_state.uploaded_template.getvalue()})
+
+                        response_preguntas = model.generate_content(contenido_ia_preguntas)
+                        
+                        documento = docx.Document()
+                        documento.add_heading("Guion Estratégico de Enfoque", level=0)
+                        agregar_markdown_a_word(documento, response_preguntas.text)
+                        
+                        doc_io = io.BytesIO()
+                        documento.save(doc_io)
+                        doc_io.seek(0)
+                        st.session_state.word_file = doc_io.getvalue()
+                        
+                        st.success("¡Documento Word generado!")
+                    except Exception as e:
+                        st.error(f"Ocurrió un error al generar el guion: {e}")
+
+    if 'word_file' in st.session_state and st.session_state.word_file:
+        st.markdown("---")
+        with st.container(border=True):
+            st.subheader("Descarga del Resultado Final")
+            st.download_button(
+                label="📥 Descargar Guion Estratégico (.docx)",
+                data=st.session_state.word_file,
+                file_name="guion_estrategico.docx",
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                use_container_width=True
+            )
 # =============================================================================
 #                        LÓGICA PRINCIPAL (ROUTER) - VERSIÓN CORRECTA
 # =============================================================================
