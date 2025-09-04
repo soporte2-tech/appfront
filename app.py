@@ -11,6 +11,10 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from googleapiclient.http import MediaIoBaseUpload, MediaIoBaseDownload
 
+# =============================================================================
+#           BLOQUE COMPLETO DE CONFIGURACIÓN Y FUNCIONES DE DRIVE
+# =============================================================================
+
 # --- CONFIGURACIÓN DE GOOGLE OAUTH Y DRIVE ---
 SCOPES = ['https://www.googleapis.com/auth/drive']
 CLIENT_CONFIG = {
@@ -19,13 +23,51 @@ CLIENT_CONFIG = {
         "client_secret": st.secrets["GOOGLE_CLIENT_SECRET"],
         "redirect_uris": [st.secrets["GOOGLE_REDIRECT_URI"]],
         "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-        "token_uri": "https://oauth2.googleapis.com/token", # Corregido de token_uri a token
+        "token_uri": "https://oauth2.googleapis.com/token",
     }
 }
 ROOT_FOLDER_NAME = "ProyectosLicitaciones"
 
+
+# --- FUNCIONES DE INTERACCIÓN CON GOOGLE DRIVE ---
+
+def find_or_create_folder(service, folder_name, parent_id=None, folder_id=None, retries=3):
+    """Busca/crea una carpeta con reintentos. Si se da un folder_id, lo devuelve directamente."""
+    
+    if folder_id:
+        return folder_id
+
+    query = f"name = '{folder_name}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false"
+    if parent_id:
+        query += f" and '{parent_id}' in parents"
+    
+    for attempt in range(retries):
+        try:
+            response = service.files().list(q=query, spaces='drive', fields='files(id, name)').execute()
+            files = response.get('files', [])
+            
+            if files:
+                return files[0]['id']
+            else:
+                file_metadata = {'name': folder_name, 'mimeType': 'application/vnd.google-apps.folder'}
+                if parent_id:
+                    file_metadata['parents'] = [parent_id]
+                folder = service.files().create(body=file_metadata, fields='id').execute()
+                st.toast(f"Carpeta '{folder_name}' creada en tu Drive.")
+                return folder.get('id')
+        except TimeoutError:
+            if attempt < retries - 1:
+                st.toast(f"Timeout al conectar con Drive. Reintentando ({attempt + 1}/{retries-1})...")
+                time.sleep(2) 
+            else:
+                st.error("No se pudo conectar con Google Drive después de varios intentos.")
+                raise
+        except Exception as e:
+            st.error(f"Ocurrió un error inesperado con Google Drive: {e}")
+            raise
+
 def upload_file_to_drive(service, file_object, folder_id):
-    """Sube un objeto de archivo (de st.file_uploader) a una carpeta de Drive."""
+    """Sube un objeto de archivo a una carpeta de Drive."""
     file_metadata = {
         'name': file_object.name,
         'parents': [folder_id]
@@ -511,7 +553,11 @@ def phase_1_page():
 
     st.markdown(f"<h3>FASE 1: Análisis y Estructura</h3>", unsafe_allow_html=True)
     st.info(f"Estás trabajando en el proyecto: **{project_name}**")
-
+    
+    # Buscamos o creamos la subcarpeta 'Pliegos' y obtenemos su ID
+    pliegos_folder_id = find_or_create_folder(service, "Pliegos", parent_id=project_folder_id)
+    # Buscamos los archivos DENTRO de la carpeta Pliegos
+    document_files = get_files_in_project(service, pliegos_folder_id)
     # Gestión de archivos (esta parte ya funciona bien)
     existing_files = get_files_in_project(service, project_folder_id)
     document_files = [f for f in existing_files if f['name'] != 'ultimo_indice.json']
@@ -548,6 +594,8 @@ def phase_1_page():
 
     # --- !! COMIENZO DE LA LÓGICA CORREGIDA !! ---
     
+    # Buscamos si hay un índice guardado DENTRO de la carpeta del proyecto (no en subcarpetas)
+    docs_app_folder_id = find_or_create_folder(service, "Documentos aplicación", parent_id=project_folder_id)   
     saved_index_id = find_file_by_name(service, "ultimo_indice.json", project_folder_id)
 
     # Creamos las columnas para los botones de acción
@@ -599,21 +647,21 @@ def phase_1_page():
     st.button("← Volver a Selección de Proyecto", on_click=back_to_project_selection_and_cleanup, use_container_width=True, key="back_to_projects")
 
 # =============================================================================
-#           PÁGINA 4: RESULTADOS FASE 1 (VERSIÓN FINAL CORREGIDA)
+#           VERSIÓN FINAL Y COMPLETA DE phase_1_results_page()
 # =============================================================================
 
 def phase_1_results_page():
-    """Página para revisar los resultados de la Fase 1, con opción de regenerar."""
+    """Página para revisar, regenerar, aceptar y guardar los resultados en Drive."""
     st.markdown("<h3>FASE 1: Revisión de Resultados</h3>", unsafe_allow_html=True)
-    st.markdown("Revisa el índice propuesto por la IA. Si es correcto, genera el guion. Si no, pide los cambios que necesites.")
+    st.markdown("Revisa el índice. Si es correcto, genera y guarda el guion. Si no, pide los cambios que necesites.")
     st.markdown("---")
-    st.button("← Volver a Cargar Archivos", on_click=go_to_phase1)
+    st.button("← Volver a la gestión de archivos", on_click=go_to_phase1)
 
     if 'generated_structure' not in st.session_state or not st.session_state.generated_structure:
         st.warning("No se ha generado ninguna estructura. Por favor, vuelve a la fase anterior.")
         return
 
-    # --- FUNCIÓN CALLBACK CORREGIDA ---
+    # --- Función interna para la lógica de regeneración ---
     def handle_regeneration():
         feedback_text = st.session_state.feedback_area
         if not feedback_text:
@@ -626,19 +674,14 @@ def phase_1_results_page():
                 contenido_ia_regeneracion.append("--- INSTRUCCIONES DEL USUARIO ---\n" + feedback_text)
                 contenido_ia_regeneracion.append("--- ESTRUCTURA JSON ANTERIOR A CORREGIR ---\n" + json.dumps(st.session_state.generated_structure, indent=2))
                 
-                # --- !! COMIENZO DEL CAMBIO !! ---
-                # Ahora los archivos vienen de Drive, no son UploadedFile.
-                # Necesitamos descargarlos para enviarlos a la IA.
                 if st.session_state.get('uploaded_pliegos'):
                     service = st.session_state.drive_service
                     for file_info in st.session_state.uploaded_pliegos:
-                        # 'file_info' es ahora un diccionario {'id': ..., 'name': ..., 'mimeType': ...}
                         file_content_bytes = download_file_from_drive(service, file_info['id'])
                         contenido_ia_regeneracion.append({
-                            "mime_type": file_info['mimeType'], # Usamos 'mimeType' en lugar de '.type'
+                            "mime_type": file_info['mimeType'],
                             "data": file_content_bytes.getvalue()
                         })
-                # --- !! FIN DEL CAMBIO !! ---
 
                 generation_config = genai.GenerationConfig(response_mime_type="application/json")
                 response_regeneracion = model.generate_content(contenido_ia_regeneracion, generation_config=generation_config)
@@ -672,13 +715,30 @@ def phase_1_results_page():
 
         with col_val_2:
             if st.button("Aceptar y Generar Guion →", type="primary", use_container_width=True):
-                with st.spinner("✍️ Creando el guion estratégico..."):
+                with st.spinner("Guardando índice final y creando el guion..."):
                     try:
-                        # --- !! TAMBIÉN NECESITAMOS CORREGIR ESTA PARTE !! ---
-                        contenido_ia_preguntas = [PROMPT_PREGUNTAS_TECNICAS]
+                        service = st.session_state.drive_service
+                        project_folder_id = st.session_state.selected_project['id']
+                        
+                        docs_app_folder_id = find_or_create_folder(service, "Documentos aplicación", parent_id=project_folder_id)
+
+                        # Guardamos el índice final en la subcarpeta correcta
+                        indice_final = st.session_state.generated_structure
+                        json_bytes = json.dumps(indice_final, indent=2).encode('utf-8')
+                        mock_file_obj = io.BytesIO(json_bytes)
+                        mock_file_obj.name = "ultimo_indice.json"
+                        mock_file_obj.type = "application/json"
+                        
+                        saved_index_id = find_file_by_name(service, "ultimo_indice.json", docs_app_folder_id)
+                        if saved_index_id:
+                            delete_file_from_drive(service, saved_index_id)
+                        upload_file_to_drive(service, mock_file_obj, docs_app_folder_id)
+                        st.toast("Índice final guardado en 'Documentos aplicación'.")
+
+                        # Generamos el guion
+                        contenido_ia_preguntas = [PROMPT_PREGŪNTAS_TECNICAS]
                         contenido_ia_preguntas.append("--- ESTRUCTURA VALIDADA (JSON) ---\n" + json.dumps(st.session_state.generated_structure, indent=2))
                         if st.session_state.get('uploaded_pliegos'):
-                            service = st.session_state.drive_service
                             for file_info in st.session_state.uploaded_pliegos:
                                 file_content_bytes = download_file_from_drive(service, file_info['id'])
                                 contenido_ia_preguntas.append({
@@ -697,7 +757,18 @@ def phase_1_results_page():
                         doc_io.seek(0)
                         st.session_state.word_file = doc_io.getvalue()
                         
-                        st.success("¡Documento Word generado!")
+                        # Guardamos el documento Word generado en la subcarpeta correcta
+                        word_file_obj = io.BytesIO(st.session_state.word_file)
+                        word_file_obj.name = "guion_estrategico.docx"
+                        word_file_obj.type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                        
+                        saved_guion_id = find_file_by_name(service, "guion_estrategico.docx", docs_app_folder_id)
+                        if saved_guion_id:
+                            delete_file_from_drive(service, saved_guion_id)
+                        upload_file_to_drive(service, word_file_obj, docs_app_folder_id)
+                        
+                        st.success("¡Guion Estratégico generado y guardado en 'Documentos aplicación'!")
+                    
                     except Exception as e:
                         st.error(f"Ocurrió un error al generar el guion: {e}")
 
