@@ -16,7 +16,7 @@ from googleapiclient.http import MediaIoBaseUpload, MediaIoBaseDownload
 # =============================================================================
 
 # --- CONFIGURACIÓN DE GOOGLE OAUTH Y DRIVE ---
-SCOPES = ['https://www.googleapis.com/auth/drive']
+SCOPES = ['https://www.googleapis.com/auth/drive', 'https://www.googleapis.com/auth/gmail.send']
 CLIENT_CONFIG = {
     "web": {
         "client_id": st.secrets["GOOGLE_CLIENT_ID"],
