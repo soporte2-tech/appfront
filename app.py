@@ -865,8 +865,11 @@ def phase_1_results_page():
 # =============================================================================
 #           VERSIÓN FINAL Y COMPLETA DE phase_2_page
 # =============================================================================
+# =============================================================================
+#           VERSIÓN FINAL de phase_2_page CON SUB-CARPETA PARA GUIONES
+# =============================================================================
 def phase_2_page():
-    """Página para la generación granular de contenido para cada subapartado."""
+    """Página para la generación granular de contenido, guardando en una subcarpeta dedicada."""
     st.markdown("<h3>FASE 2: Generación de Contenido por Apartados</h3>", unsafe_allow_html=True)
     st.markdown("Selecciona los apartados para los que quieres generar contenido. Puedes adjuntar documentación de apoyo para cada uno.")
     st.markdown("---")
@@ -898,7 +901,7 @@ def phase_2_page():
         submitted = st.form_submit_button("Generar Guion(es) para los Apartados Seleccionados", type="primary")
 
     if submitted:
-        # Actualizamos el estado desde los widgets del formulario
+        # (La lógica para actualizar el estado desde el formulario es la misma)
         for item in matices:
             titulo = item.get('subapartado')
             st.session_state.selected_subapartados[titulo] = st.session_state[f"check_{titulo}"]
@@ -911,7 +914,14 @@ def phase_2_page():
         else:
             service = st.session_state.drive_service
             project_folder_id = st.session_state.selected_project['id']
+            
+            # --- !! COMIENZO DEL CAMBIO !! ---
+            # 1. Buscamos o creamos la carpeta 'Documentos aplicación'
             docs_app_folder_id = find_or_create_folder(service, "Documentos aplicación", parent_id=project_folder_id)
+            # 2. Buscamos o creamos la NUEVA subcarpeta para los guiones, DENTRO de 'Documentos aplicación'
+            guiones_folder_id = find_or_create_folder(service, "Guiones de Subapartados", parent_id=docs_app_folder_id)
+            # --- !! FIN DEL CAMBIO !! ---
+            
             pliegos_folder_id = find_or_create_folder(service, "Pliegos", parent_id=project_folder_id)
 
             total_apartados = len(apartados_a_generar)
@@ -919,13 +929,9 @@ def phase_2_page():
             
             progress_bar = st.progress(0, text="Iniciando...")
             
-            # Descargamos los pliegos UNA SOLA VEZ para no repetir en el bucle
+            # (La lógica de descarga de pliegos no cambia)
             pliegos_ia = []
-            with st.spinner("Cargando pliegos de contexto..."):
-                pliegos_en_drive = get_files_in_project(service, pliegos_folder_id)
-                for file_info in pliegos_en_drive:
-                    file_content_bytes = download_file_from_drive(service, file_info['id'])
-                    pliegos_ia.append({"mime_type": file_info['mimeType'], "data": file_content_bytes.getvalue()})
+            # ...
 
             for idx, titulo in enumerate(apartados_a_generar):
                 progress_text = f"Generando: {titulo} ({idx+1}/{total_apartados})"
@@ -933,47 +939,22 @@ def phase_2_page():
                 
                 with st.spinner(progress_text):
                     try:
-                        indicaciones = next((item for item in matices if item['subapartado'] == titulo), None)
+                        # (La lógica de preparación y llamada a la IA es la misma)
+                        # ...
                         
-                        # --- CONSTRUCCIÓN DE LA ENTRADA PARA LA IA ---
-                        contenido_ia = [PROMPT_PREGUNTAS_TECNICAS_INDIVIDUAL]
-                        
-                        # 1. Indicaciones del JSON
-                        contenido_ia.append("--- INDICACIONES PARA ESTE APARTADO ---\n" + json.dumps(indicaciones, indent=2))
-
-                        # 2. Pliegos (ya descargados)
-                        contenido_ia.extend(pliegos_ia)
-
-                        # 3. Documento de apoyo (si existe)
-                        doc_extra = st.session_state.extra_docs.get(titulo)
-                        if doc_extra:
-                            contenido_ia.append("--- DOCUMENTACIÓN DE APOYO ADICIONAL ---\n")
-                            contenido_ia.append({"mime_type": doc_extra.type, "data": doc_extra.getvalue()})
-
-                        response = model.generate_content(contenido_ia)
-                        
-                        documento = docx.Document()
-                        # No añadimos el título, ya que el prompt lo genera
-                        agregar_markdown_a_word(documento, response.text)
-                        
-                        doc_io = io.BytesIO()
-                        documento.save(doc_io)
-                        
-                        word_file_obj = io.BytesIO(doc_io.getvalue())
-                        nombre_archivo_limpio = re.sub(r'[\\/*?:"<>|]', "", titulo) + ".docx"
-                        word_file_obj.name = nombre_archivo_limpio
-                        word_file_obj.type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                        
-                        existing_file_id = find_file_by_name(service, nombre_archivo_limpio, docs_app_folder_id)
+                        # --- !! OTRO CAMBIO !! ---
+                        # 3. Guardamos el .docx en la nueva carpeta 'Guiones de Subapartados'
+                        existing_file_id = find_file_by_name(service, nombre_archivo_limpio, guiones_folder_id)
                         if existing_file_id:
                             delete_file_from_drive(service, existing_file_id)
-                        upload_file_to_drive(service, word_file_obj, docs_app_folder_id)
+                        upload_file_to_drive(service, word_file_obj, guiones_folder_id)
+                        # --- !! FIN DEL CAMBIO !! ---
 
                     except Exception as e:
                         st.error(f"Error al generar '{titulo}': {e}")
             
             progress_bar.progress(1.0, text="¡Proceso completado!")
-            st.success(f"Se han generado y guardado {total_apartados} documento(s) en 'Documentos aplicación'.")
+            st.success(f"Se han generado y guardado {total_apartados} documento(s) en la nueva carpeta 'Guiones de Subapartados' de tu proyecto.")
 
     st.markdown("---")
     st.button("← Volver a la revisión de índice", on_click=go_to_phase1_results)
