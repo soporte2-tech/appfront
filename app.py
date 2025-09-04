@@ -621,7 +621,7 @@ def phase_1_page():
     st.button("← Volver a Selección de Proyecto", on_click=back_to_project_selection_and_cleanup, use_container_width=True, key="back_to_projects")
 
 # =============================================================================
-#           PÁGINA 4: RESULTADOS FASE 1 (VERSIÓN FINAL CON CALLBACK)
+#           PÁGINA 4: RESULTADOS FASE 1 (VERSIÓN FINAL CORREGIDA)
 # =============================================================================
 
 def phase_1_results_page():
@@ -635,8 +635,7 @@ def phase_1_results_page():
         st.warning("No se ha generado ninguna estructura. Por favor, vuelve a la fase anterior.")
         return
 
-    # --- NUEVA FUNCIÓN CALLBACK ---
-    # Esta función se ejecutará ANTES de que la página se redibuje.
+    # --- FUNCIÓN CALLBACK CORREGIDA ---
     def handle_regeneration():
         feedback_text = st.session_state.feedback_area
         if not feedback_text:
@@ -649,11 +648,19 @@ def phase_1_results_page():
                 contenido_ia_regeneracion.append("--- INSTRUCCIONES DEL USUARIO ---\n" + feedback_text)
                 contenido_ia_regeneracion.append("--- ESTRUCTURA JSON ANTERIOR A CORREGIR ---\n" + json.dumps(st.session_state.generated_structure, indent=2))
                 
+                # --- !! COMIENZO DEL CAMBIO !! ---
+                # Ahora los archivos vienen de Drive, no son UploadedFile.
+                # Necesitamos descargarlos para enviarlos a la IA.
                 if st.session_state.get('uploaded_pliegos'):
-                    for pliego in st.session_state.uploaded_pliegos:
-                        contenido_ia_regeneracion.append({"mime_type": pliego.type, "data": pliego.getvalue()})
-                if st.session_state.get('uploaded_template'):
-                    contenido_ia_regeneracion.append({"mime_type": st.session_state.uploaded_template.type, "data": st.session_state.uploaded_template.getvalue()})
+                    service = st.session_state.drive_service
+                    for file_info in st.session_state.uploaded_pliegos:
+                        # 'file_info' es ahora un diccionario {'id': ..., 'name': ..., 'mimeType': ...}
+                        file_content_bytes = download_file_from_drive(service, file_info['id'])
+                        contenido_ia_regeneracion.append({
+                            "mime_type": file_info['mimeType'], # Usamos 'mimeType' en lugar de '.type'
+                            "data": file_content_bytes.getvalue()
+                        })
+                # --- !! FIN DEL CAMBIO !! ---
 
                 generation_config = genai.GenerationConfig(response_mime_type="application/json")
                 response_regeneracion = model.generate_content(contenido_ia_regeneracion, generation_config=generation_config)
@@ -663,7 +670,6 @@ def phase_1_results_page():
                     nueva_estructura = json.loads(json_limpio_str_regenerado)
                     st.session_state.generated_structure = nueva_estructura
                     st.toast("¡Estructura regenerada con éxito!")
-                    # Aquí es seguro modificar el estado porque estamos en un callback.
                     st.session_state.feedback_area = ""
                 else:
                     st.error("La IA no devolvió una estructura válida tras la regeneración.")
@@ -679,27 +685,28 @@ def phase_1_results_page():
         
         col_val_1, col_val_2 = st.columns(2)
         with col_val_1:
-            # El botón ahora llama a la función callback usando on_click
             st.button(
                 "Regenerar con Feedback",
                 on_click=handle_regeneration,
                 use_container_width=True,
-                disabled=not st.session_state.get("feedback_area") # Desactivado si no hay texto
+                disabled=not st.session_state.get("feedback_area")
             )
 
         with col_val_2:
             if st.button("Aceptar y Generar Guion →", type="primary", use_container_width=True):
-                # La lógica para generar el guion no cambia
                 with st.spinner("✍️ Creando el guion estratégico..."):
-                    # (El resto del código para generar el guion es idéntico y correcto)
                     try:
+                        # --- !! TAMBIÉN NECESITAMOS CORREGIR ESTA PARTE !! ---
                         contenido_ia_preguntas = [PROMPT_PREGUNTAS_TECNICAS]
                         contenido_ia_preguntas.append("--- ESTRUCTURA VALIDADA (JSON) ---\n" + json.dumps(st.session_state.generated_structure, indent=2))
                         if st.session_state.get('uploaded_pliegos'):
-                            for pliego in st.session_state.uploaded_pliegos:
-                                contenido_ia_preguntas.append({"mime_type": pliego.type, "data": pliego.getvalue()})
-                        if st.session_state.get('uploaded_template'):
-                            contenido_ia_preguntas.append({"mime_type": st.session_state.uploaded_template.type, "data": st.session_state.uploaded_template.getvalue()})
+                            service = st.session_state.drive_service
+                            for file_info in st.session_state.uploaded_pliegos:
+                                file_content_bytes = download_file_from_drive(service, file_info['id'])
+                                contenido_ia_preguntas.append({
+                                    "mime_type": file_info['mimeType'],
+                                    "data": file_content_bytes.getvalue()
+                                })
 
                         response_preguntas = model.generate_content(contenido_ia_preguntas)
                         
