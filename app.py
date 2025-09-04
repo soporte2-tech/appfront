@@ -24,6 +24,21 @@ CLIENT_CONFIG = {
 }
 ROOT_FOLDER_NAME = "ProyectosLicitaciones"
 
+def upload_file_to_drive(service, file_object, folder_id):
+    """Sube un objeto de archivo (de st.file_uploader) a una carpeta de Drive."""
+    file_metadata = {
+        'name': file_object.name,
+        'parents': [folder_id]
+    }
+    media = MediaIoBaseUpload(io.BytesIO(file_object.getvalue()),
+                              mimetype=file_object.type,
+                              resumable=True)
+    file = service.files().create(body=file_metadata,
+                                  media_body=media,
+                                  fields='id').execute()
+    st.toast(f"📄 Archivo '{file_object.name}' guardado en Drive.")
+    return file.get('id')
+
 # --- CONFIGURACIÓN DE LA PÁGINA ---
 st.set_page_config(page_title="Asistente de Licitaciones AI", layout="wide", initial_sidebar_state="collapsed")
 
@@ -468,81 +483,136 @@ def project_selection_page():
 # =============================================================================
 
 def phase_1_page():
-    """Página para la carga de documentos de la Fase 1, ahora vinculada a un proyecto."""
-    # Verificamos que hemos llegado aquí con un proyecto seleccionado
+    """Página de Fase 1 que comprueba archivos en Drive antes de pedir subirlos."""
     if not st.session_state.get('selected_project'):
         st.warning("No se ha seleccionado ningún proyecto. Volviendo a la selección.")
         go_to_project_selection()
         st.rerun()
 
     project_name = st.session_state.selected_project['name']
+    project_folder_id = st.session_state.selected_project['id']
+    service = st.session_state.drive_service
+
     st.markdown(f"<h3>FASE 1: Análisis y Estructura</h3>", unsafe_allow_html=True)
     st.info(f"Estás trabajando en el proyecto: **{project_name}**")
-    st.markdown("Carga los documentos base para que la IA genere la estructura de la memoria técnica.")
-    st.markdown("---")
-    
-    with st.container(border=True):
-        st.subheader("PASO 1: Carga de Documentos")
-        has_template = st.radio("¿Dispones de una plantilla?", ("No", "Sí"), horizontal=True, key="template_radio")
-        
-        # Usamos variables locales para los uploaders
-        uploaded_template = None
-        if has_template == 'Sí':
-            uploaded_template = st.file_uploader("Sube tu plantilla (DOCX/PDF)", type=['docx', 'pdf'], key="template_uploader")
-        
-        uploaded_pliegos = st.file_uploader("Sube los Pliegos (DOCX/PDF)", type=['docx', 'pdf'], accept_multiple_files=True, key="pliegos_uploader")
 
-    st.write("")
-    if st.button("Generar Estructura", type="primary", use_container_width=True):
-        if not uploaded_pliegos:
-            st.warning("Por favor, sube al menos un archivo de Pliegos.")
-        else:
-            with st.spinner("🧠 Analizando documentos y generando la estructura..."):
+    # 1. Comprobar si ya existen archivos en la carpeta del proyecto en Drive
+    with st.spinner("Buscando archivos existentes en tu Drive..."):
+        existing_files = get_files_in_project(service, project_folder_id)
+
+    # Si NO encontramos archivos, mostramos la interfaz de subida
+    if not existing_files:
+        st.markdown("Carga los documentos base para este proyecto. Se guardarán en Drive para el futuro.")
+        with st.container(border=True):
+            st.subheader("PASO 1: Carga de Documentos")
+            has_template = st.radio("¿Dispones de una plantilla?", ("No", "Sí"), horizontal=True, key="template_radio")
+            
+            uploaded_template = None
+            if has_template == 'Sí':
+                uploaded_template = st.file_uploader("Sube tu plantilla (DOCX/PDF)", type=['docx', 'pdf'], key="template_uploader")
+            
+            uploaded_pliegos = st.file_uploader("Sube los Pliegos (DOCX/PDF)", type=['docx', 'pdf'], accept_multiple_files=True, key="pliegos_uploader")
+
+        if st.button("Generar Estructura y Guardar Archivos", type="primary", use_container_width=True):
+            if not uploaded_pliegos:
+                st.warning("Por favor, sube al menos un archivo de Pliegos.")
+            else:
+                with st.spinner("Guardando archivos en Drive y analizando..."):
+                    # 2. Guardar los nuevos archivos en Drive
+                    try:
+                        if uploaded_template:
+                            upload_file_to_drive(service, uploaded_template, project_folder_id)
+                        for pliego in uploaded_pliegos:
+                            upload_file_to_drive(service, pliego, project_folder_id)
+                        
+                        # Guardamos en session_state para la siguiente página
+                        st.session_state.uploaded_pliegos = uploaded_pliegos
+                        st.session_state.uploaded_template = uploaded_template
+
+                        # 3. La misma lógica de análisis de IA que ya tenías
+                        # ... (código de llamada a Gemini)
+                        contenido_ia = []
+                        texto_plantilla = ""
+                        if has_template == 'Sí' and uploaded_template is not None:
+                            prompt_a_usar = PROMPT_PLANTILLA
+                            if uploaded_template.name.endswith('.docx'):
+                                doc = docx.Document(uploaded_template)
+                                texto_plantilla = "\n".join([p.text for p in doc.paragraphs])
+                            else:
+                                reader = PdfReader(uploaded_template)
+                                texto_plantilla = "\n".join([page.extract_text() for page in reader.pages])
+                        else:
+                            prompt_a_usar = PROMPT_PLIEGOS
+
+                        contenido_ia.append(prompt_a_usar)
+                        if texto_plantilla:
+                            contenido_ia.append(texto_plantilla)
+
+                        for pliego in uploaded_pliegos:
+                            contenido_ia.append({"mime_type": pliego.type, "data": pliego.getvalue()})
+
+                        generation_config = genai.GenerationConfig(response_mime_type="application/json")
+                        response = model.generate_content(contenido_ia, generation_config=generation_config)
+                        
+                        json_limpio_str = limpiar_respuesta_json(response.text)
+                        if json_limpio_str:
+                            informacion_estructurada = json.loads(json_limpio_str)
+                            st.session_state.generated_structure = informacion_estructurada
+                            go_to_phase1_results()
+                            st.rerun()
+                        else:
+                            st.error("La IA devolvió una respuesta vacía o no válida.")
+                    except Exception as e:
+                        st.error(f"Ocurrió un error: {e}")
+
+    # Si SÍ encontramos archivos, los mostramos y damos la opción de usarlos
+    else:
+        st.success("¡Hemos encontrado estos archivos en tu Drive para este proyecto!")
+        with st.container(border=True):
+            for file in existing_files:
+                st.write(f"📄 **{file['name']}**")
+
+        if st.button("Analizar Archivos Existentes", type="primary", use_container_width=True):
+            with st.spinner("Descargando archivos de Drive y analizando..."):
                 try:
-                    # Guardamos los archivos subidos en la memoria temporal (session_state)
-                    # para que la siguiente página (Resultados) pueda acceder a ellos.
-                    st.session_state.uploaded_pliegos = uploaded_pliegos
-                    st.session_state.uploaded_template = uploaded_template
+                    # 4. Descargar los archivos de Drive a la memoria para analizarlos
+                    downloaded_files_for_ia = []
+                    mock_uploaded_files = [] # Para la página de resultados
+                    
+                    for file in existing_files:
+                        file_content_bytes = download_file_from_drive(service, file['id'])
+                        downloaded_files_for_ia.append({"mime_type": file['mimeType'], "data": file_content_bytes.getvalue()})
+                        
+                        # Creamos un "falso" UploadedFile para que la página de resultados funcione igual
+                        mock_file = io.BytesIO(file_content_bytes.getvalue())
+                        mock_file.name = file['name']
+                        mock_file.type = file['mimeType']
+                        mock_uploaded_files.append(mock_file)
 
-                    contenido_ia = []
-                    texto_plantilla = ""
-                    if has_template == 'Sí' and uploaded_template is not None:
-                        prompt_a_usar = PROMPT_PLANTILLA
-                        if uploaded_template.name.endswith('.docx'):
-                            doc = docx.Document(uploaded_template)
-                            texto_plantilla = "\n".join([p.text for p in doc.paragraphs])
-                        elif uploaded_template.name.endswith('.pdf'):
-                            reader = PdfReader(uploaded_template)
-                            texto_plantilla = "\n".join([page.extract_text() for page in reader.pages])
-                    else:
-                        prompt_a_usar = PROMPT_PLIEGOS
+                    # Guardamos en session_state para la siguiente página
+                    # Aquí asumimos que el primer archivo es la plantilla si hay más de uno,
+                    # puedes mejorar esta lógica si lo necesitas.
+                    st.session_state.uploaded_pliegos = mock_uploaded_files
+                    st.session_state.uploaded_template = None # O lo identificas por nombre
 
-                    contenido_ia.append(prompt_a_usar)
-                    if texto_plantilla:
-                        contenido_ia.append(texto_plantilla)
-
-                    for pliego in uploaded_pliegos:
-                        contenido_ia.append({"mime_type": pliego.type, "data": pliego.getvalue()})
-
+                    # 5. Misma lógica de análisis, pero con los archivos descargados
+                    contenido_ia = [PROMPT_PLIEGOS] # Asumimos que no hay plantilla si usamos archivos existentes
+                    contenido_ia.extend(downloaded_files_for_ia)
+                    
                     generation_config = genai.GenerationConfig(response_mime_type="application/json")
                     response = model.generate_content(contenido_ia, generation_config=generation_config)
                     
                     json_limpio_str = limpiar_respuesta_json(response.text)
                     if json_limpio_str:
-                        try:
-                            informacion_estructurada = json.loads(json_limpio_str)
-                            st.session_state.generated_structure = informacion_estructurada
-                            go_to_phase1_results()
-                            st.rerun()
-                        except json.JSONDecodeError as json_error:
-                            st.error(f"Error de formato JSON: {json_error}")
-                            st.text_area("JSON con errores:", json_limpio_str, height=300)
+                        informacion_estructurada = json.loads(json_limpio_str)
+                        st.session_state.generated_structure = informacion_estructurada
+                        go_to_phase1_results()
+                        st.rerun()
                     else:
                         st.error("La IA devolvió una respuesta vacía o no válida.")
-                        st.text_area("Respuesta original de la IA:", response.text, height=200)
 
                 except Exception as e:
-                    st.error(f"Ocurrió un error al contactar con la IA: {e}")
+                    st.error(f"Ocurrió un error: {e}")
 
     st.write("")
     st.markdown("---")
