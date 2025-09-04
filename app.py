@@ -881,14 +881,20 @@ def phase_2_page():
 
     matices = st.session_state.generated_structure.get('matices_desarrollo', [])
     
-    if 'selected_subapartados' not in st.session_state: st.session_state.selected_subapartados = {item.get('subapartado'): False for item in matices}
-    if 'extra_docs' not in st.session_state: st.session_state.extra_docs = {}
+    # Inicializamos el estado si no existe
+    if 'selected_subapartados' not in st.session_state:
+        st.session_state.selected_subapartados = {item.get('subapartado'): False for item in matices}
+    if 'extra_docs' not in st.session_state:
+        st.session_state.extra_docs = {}
 
+    # Usamos un formulario para agrupar los widgets
     with st.form("generacion_guiones_form"):
         st.subheader("Selección de Apartados")
         
         for i, item in enumerate(matices):
-            subapartado_titulo = item.get('subapartado', f'Apartado sin título {i+1}')
+            subapartado_titulo = item.get('subapartado')
+            if not subapartado_titulo: continue # Evita errores si un subapartado no tiene título
+
             col1, col2, col3 = st.columns([0.5, 4, 3])
             
             with col1:
@@ -901,11 +907,12 @@ def phase_2_page():
         submitted = st.form_submit_button("Generar Guion(es) para los Apartados Seleccionados", type="primary")
 
     if submitted:
-        # (La lógica para actualizar el estado desde el formulario es la misma)
+        # Recogemos los valores del formulario y los guardamos en el estado de la sesión
         for item in matices:
             titulo = item.get('subapartado')
-            st.session_state.selected_subapartados[titulo] = st.session_state[f"check_{titulo}"]
-            st.session_state.extra_docs[titulo] = st.session_state[f"upload_{titulo}"]
+            if titulo:
+                st.session_state.selected_subapartados[titulo] = st.session_state[f"check_{titulo}"]
+                st.session_state.extra_docs[titulo] = st.session_state[f"upload_{titulo}"]
 
         apartados_a_generar = [titulo for titulo, seleccionado in st.session_state.selected_subapartados.items() if seleccionado]
 
@@ -915,13 +922,9 @@ def phase_2_page():
             service = st.session_state.drive_service
             project_folder_id = st.session_state.selected_project['id']
             
-            # --- !! COMIENZO DEL CAMBIO !! ---
-            # 1. Buscamos o creamos la carpeta 'Documentos aplicación'
+            # Buscamos o creamos las carpetas necesarias
             docs_app_folder_id = find_or_create_folder(service, "Documentos aplicación", parent_id=project_folder_id)
-            # 2. Buscamos o creamos la NUEVA subcarpeta para los guiones, DENTRO de 'Documentos aplicación'
             guiones_folder_id = find_or_create_folder(service, "Guiones de Subapartados", parent_id=docs_app_folder_id)
-            # --- !! FIN DEL CAMBIO !! ---
-            
             pliegos_folder_id = find_or_create_folder(service, "Pliegos", parent_id=project_folder_id)
 
             total_apartados = len(apartados_a_generar)
@@ -929,32 +932,63 @@ def phase_2_page():
             
             progress_bar = st.progress(0, text="Iniciando...")
             
-            # (La lógica de descarga de pliegos no cambia)
+            # Descargamos los pliegos una sola vez para optimizar
             pliegos_ia = []
-            # ...
+            with st.spinner("Cargando pliegos de contexto..."):
+                pliegos_en_drive = get_files_in_project(service, pliegos_folder_id)
+                for file_info in pliegos_en_drive:
+                    file_content_bytes = download_file_from_drive(service, file_info['id'])
+                    pliegos_ia.append({"mime_type": file_info['mimeType'], "data": file_content_bytes.getvalue()})
 
+            # Bucle para generar cada documento seleccionado
             for idx, titulo in enumerate(apartados_a_generar):
                 progress_text = f"Generando: {titulo} ({idx+1}/{total_apartados})"
                 progress_bar.progress((idx) / total_apartados, text=progress_text)
                 
                 with st.spinner(progress_text):
                     try:
-                        # (La lógica de preparación y llamada a la IA es la misma)
-                        # ...
+                        # CORRECCIÓN: Definimos el nombre del archivo al principio
+                        nombre_archivo_limpio = re.sub(r'[\\/*?:"<>|]', "", titulo) + ".docx"
+
+                        # Buscamos las indicaciones para este apartado
+                        indicaciones = next((item for item in matices if item['subapartado'] == titulo), None)
                         
-                        # --- !! OTRO CAMBIO !! ---
-                        # 3. Guardamos el .docx en la nueva carpeta 'Guiones de Subapartados'
+                        # Preparamos el contenido para la IA
+                        contenido_ia = [PROMPT_PREGUNTAS_TECNICAS_INDIVIDUAL]
+                        contenido_ia.append("--- INDICACIONES PARA ESTE APARTADO ---\n" + json.dumps(indicaciones, indent=2))
+                        contenido_ia.extend(pliegos_ia)
+
+                        doc_extra = st.session_state.extra_docs.get(titulo)
+                        if doc_extra:
+                            contenido_ia.append("--- DOCUMENTACIÓN DE APOYO ADICIONAL ---\n")
+                            contenido_ia.append({"mime_type": doc_extra.type, "data": doc_extra.getvalue()})
+
+                        # Llamamos a la IA
+                        response = model.generate_content(contenido_ia)
+                        
+                        # Creamos el documento Word
+                        documento = docx.Document()
+                        agregar_markdown_a_word(documento, response.text)
+                        
+                        # Preparamos el archivo en memoria para subirlo a Drive
+                        doc_io = io.BytesIO()
+                        documento.save(doc_io)
+                        
+                        word_file_obj = io.BytesIO(doc_io.getvalue())
+                        word_file_obj.name = nombre_archivo_limpio
+                        word_file_obj.type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                        
+                        # Subimos el archivo a la carpeta 'Guiones de Subapartados'
                         existing_file_id = find_file_by_name(service, nombre_archivo_limpio, guiones_folder_id)
                         if existing_file_id:
                             delete_file_from_drive(service, existing_file_id)
                         upload_file_to_drive(service, word_file_obj, guiones_folder_id)
-                        # --- !! FIN DEL CAMBIO !! ---
 
                     except Exception as e:
                         st.error(f"Error al generar '{titulo}': {e}")
             
             progress_bar.progress(1.0, text="¡Proceso completado!")
-            st.success(f"Se han generado y guardado {total_apartados} documento(s) en la nueva carpeta 'Guiones de Subapartados' de tu proyecto.")
+            st.success(f"Se han generado y guardado {total_apartados} documento(s) en 'Guiones de Subapartados'.")
 
     st.markdown("---")
     st.button("← Volver a la revisión de índice", on_click=go_to_phase1_results)
