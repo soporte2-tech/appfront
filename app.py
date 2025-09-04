@@ -5,6 +5,24 @@ import re
 import docx
 from pypdf import PdfReader
 import io
+from google.oauth2.credentials import Credentials
+from google_auth_oauthlib.flow import Flow
+from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
+from googleapiclient.http import MediaIoBaseUpload, MediaIoBaseDownload
+
+# --- CONFIGURACIÓN DE GOOGLE OAUTH Y DRIVE ---
+SCOPES = ['https://www.googleapis.com/auth/drive']
+CLIENT_CONFIG = {
+    "web": {
+        "client_id": st.secrets["GOOGLE_CLIENT_ID"],
+        "client_secret": st.secrets["GOOGLE_CLIENT_SECRET"],
+        "redirect_uris": [st.secrets["GOOGLE_REDIRECT_URI"]],
+        "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+        "token_uri": "https://oauth2.googleapis.com/token", # Corregido de token_uri a token
+    }
+}
+ROOT_FOLDER_NAME = "ProyectosLicitaciones"
 
 # --- CONFIGURACIÓN DE LA PÁGINA ---
 st.set_page_config(page_title="Asistente de Licitaciones AI", layout="wide", initial_sidebar_state="collapsed")
@@ -187,7 +205,91 @@ Te proporcionaré DOS elementos clave:
 1.  El texto completo de los documentos base (Pliegos y/o plantilla).
 2.  La estructura que se ha generado en el mensaje anterior con los apartados y las anotaciones.
 """
+# =============================================================================
+#              NUEVAS FUNCIONES: AUTENTICACIÓN Y GOOGLE DRIVE
+# =============================================================================
 
+def get_google_flow():
+    """Crea y devuelve el objeto Flow de Google OAuth."""
+    return Flow.from_client_config(
+        client_config=CLIENT_CONFIG,
+        scopes=SCOPES,
+        redirect_uri=st.secrets["GOOGLE_REDIRECT_URI"]
+    )
+
+def get_credentials():
+    """Obtiene las credenciales del usuario desde el session_state o inicia el flujo OAuth."""
+    if 'credentials' in st.session_state and st.session_state.credentials:
+        # Check if token is expired. Refresh if it is.
+        creds = st.session_state.credentials
+        if creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+            st.session_state.credentials = creds
+        return creds
+
+    if 'code' in st.query_params:
+        try:
+            flow = get_google_flow()
+            flow.fetch_token(code=st.query_params['code'])
+            st.session_state.credentials = flow.credentials
+            st.query_params.clear()
+            st.rerun() # Rerun to clear the code from URL and update the state
+        except Exception as e:
+            st.error(f"Error al obtener el token: {e}")
+            return None
+    return None
+
+def build_drive_service(credentials):
+    """Construye y devuelve el objeto de servicio de la API de Drive."""
+    try:
+        return build('drive', 'v3', credentials=credentials)
+    except HttpError as error:
+        st.error(f"No se pudo crear el servicio de Drive: {error}")
+        return None
+
+def find_or_create_folder(service, folder_name, parent_id=None):
+    """Busca una carpeta por nombre. Si no la encuentra, la crea."""
+    query = f"name = '{folder_name}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false"
+    if parent_id:
+        query += f" and '{parent_id}' in parents"
+    
+    response = service.files().list(q=query, spaces='drive', fields='files(id, name)').execute()
+    files = response.get('files', [])
+    
+    if files:
+        return files[0]['id']
+    else:
+        file_metadata = {'name': folder_name, 'mimeType': 'application/vnd.google-apps.folder'}
+        if parent_id:
+            file_metadata['parents'] = [parent_id]
+        
+        folder = service.files().create(body=file_metadata, fields='id').execute()
+        st.toast(f"Carpeta '{folder_name}' creada en tu Drive.")
+        return folder.get('id')
+
+def list_project_folders(service, root_folder_id):
+    """Lista las subcarpetas (proyectos) dentro de la carpeta raíz."""
+    query = f"'{root_folder_id}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false"
+    response = service.files().list(q=query, spaces='drive', fields='files(id, name)').execute()
+    return {file['name']: file['id'] for file in response.get('files', [])}
+    
+def get_files_in_project(service, project_folder_id):
+    """Obtiene los archivos dentro de una carpeta de proyecto."""
+    query = f"'{project_folder_id}' in parents and trashed = false"
+    response = service.files().list(q=query, spaces='drive', fields='files(id, name, mimeType)').execute()
+    return response.get('files', [])
+    
+def download_file_from_drive(service, file_id):
+    """Descarga el contenido de un archivo de Drive y lo devuelve como BytesIO."""
+    request = service.files().get_media(fileId=file_id)
+    fh = io.BytesIO()
+    downloader = MediaIoBaseDownload(fh, request)
+    done = False
+    while done is False:
+        status, done = downloader.next_chunk()
+    fh.seek(0)
+    return fh
+    
 # --- FUNCIONES AUXILIARES DE BACKEND ---
 def limpiar_respuesta_json(texto_sucio):
     if not isinstance(texto_sucio, str): return ""
@@ -236,134 +338,226 @@ def mostrar_indice_desplegable(estructura_memoria):
                 for sub in subapartados: st.markdown(f"- {sub}")
             else: st.markdown("_Este apartado no tiene subapartados definidos._")
 
-# --- NAVEGACIÓN Y GESTIÓN DE ESTADO ---
+# --- NAVEGACIÓN Y GESTIÓN DE ESTADO (actualizada) ---
 if 'page' not in st.session_state: st.session_state.page = 'landing'
+if 'credentials' not in st.session_state: st.session_state.credentials = None
+if 'drive_service' not in st.session_state: st.session_state.drive_service = None
+if 'selected_project' not in st.session_state: st.session_state.selected_project = None
 
-def go_to_phases(): st.session_state.page = 'phases'
+def go_to_project_selection(): st.session_state.page = 'project_selection'
 def go_to_landing(): st.session_state.page = 'landing'
 def go_to_phase1(): st.session_state.page = 'phase_1'
 def go_to_phase1_results(): st.session_state.page = 'phase_1_results'
 
-def back_to_phases_and_cleanup():
-    for key in ['generated_structure', 'word_file', 'uploaded_template', 'uploaded_pliegos']:
+def back_to_project_selection_and_cleanup():
+    for key in ['generated_structure', 'word_file', 'uploaded_template', 'uploaded_pliegos', 'selected_project']:
         if key in st.session_state: del st.session_state[key]
-    go_to_phases()
-
+    go_to_project_selection()
 
 # =============================================================================
-#                              PÁGINA 1: LANDING PAGE
+#                 PÁGINAS DE LA APLICACIÓN (MODIFICADAS)
 # =============================================================================
+
 def landing_page():
-    """Muestra la pantalla de bienvenida inicial de la aplicación."""
+    """Pantalla de bienvenida que ahora incluye el inicio de sesión."""
     col1, col_center, col3 = st.columns([1, 2, 1])
     with col_center:
-        st.write("") # Espacio superior
-        
-        # Columnas internas para centrar el logo
-        inner_col1, inner_col2, inner_col3 = st.columns([1, 1, 1])
-        with inner_col2:
-            logo_url = "https://raw.githubusercontent.com/soporte2-tech/appfront/main/imagen.png"
-            # Usamos markdown con <img> para evitar el icono de ampliar
-            st.markdown(f'<div style="text-align: center;"><img src="{logo_url}" width="150"></div>', unsafe_allow_html=True)
-        
         st.write("")
-        
-        # Títulos envueltos en <div> para evitar el icono de enlace
+        st.markdown(f'<div style="text-align: center;"><img src="https://raw.githubusercontent.com/soporte2-tech/appfront/main/imagen.png" width="150"></div>', unsafe_allow_html=True)
+        st.write("")
         st.markdown("<div style='text-align: center;'><h1>Asistente Inteligente para Memorias Técnicas</h1></div>", unsafe_allow_html=True)
         st.markdown("<div style='text-align: center;'><h3>Optimiza y acelera la creación de tus propuestas de licitación</h3></div>", unsafe_allow_html=True)
+        st.markdown("---")
         
-        st.write(""); st.write("") # Doble espacio antes del botón
-        
-        # Columnas internas para centrar y dar un ancho fijo al botón
-        btn_col1, btn_col2, btn_col3 = st.columns([2, 1.5, 2])
-        with btn_col2:
-            st.button("¡Vamos allá!", on_click=go_to_phases, type="primary", use_container_width=True)
+        flow = get_google_flow()
+        auth_url, _ = flow.authorization_url(prompt='consent')
+        st.link_button("🔗 Conectar con Google Drive", auth_url, use_container_width=True, type="primary")
 
-# =============================================================================
-#                          PÁGINA 2: SELECCIÓN DE FASES
-# =============================================================================
-def phases_page():
-    """Muestra el menú principal con las tres fases seleccionables."""
-    # --- Cabecera con logo y título ---
-    logo_url = "https://raw.githubusercontent.com/soporte2-tech/appfront/main/imagen.png"
-    st.markdown(f"""
-    <div style="display: flex; align-items: center; justify-content: flex-start;">
-        <div style="flex: 1; margin-right: 20px;">
-            <img src="{logo_url}" width="120">
-        </div>
-        <div style="flex: 4;">
-            <h2 style="margin: 0; padding: 0;">Asistente Inteligente para Memorias Técnicas</h2>
-            <p style="margin: 0; padding: 0;">Selecciona una fase para comenzar</p>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+def project_selection_page():
+    """Nueva página para seleccionar o crear un proyecto en Google Drive."""
+    st.markdown("<h3>Selección de Proyecto</h3>", unsafe_allow_html=True)
+    st.markdown("Elige un proyecto existente de tu Google Drive o crea uno nuevo para empezar.")
     st.markdown("---")
     
-    # --- Columnas para las cajas de las fases ---
-    col1, col2, col3 = st.columns(3, gap="large")
-    with col1:
-        with st.container(border=True):
-            st.markdown("<h4>FASE 1: Análisis y Estructura</h4>", unsafe_allow_html=True)
-            st.write("Prepara los documentos base y define el esqueleto de la memoria técnica.")
-            st.write("")
-            st.button("Iniciar Fase 1", on_click=go_to_phase1, type="primary", use_container_width=True, key="start_f1")
-    with col2:
-        with st.container(border=True):
-            st.markdown("<h4>FASE 2: Redacción Asistida</h4>", unsafe_allow_html=True)
-            st.write("Genera los borradores iniciales de contenido para cada apartado.")
-            st.write("")
-            if st.button("Iniciar Fase 2", type="primary", use_container_width=True, key="start_f2"):
-                st.info("La Fase 2 estará disponible próximamente.")
-    with col3:
-        with st.container(border=True):
-            st.markdown("<h4>FASE 3: Revisión y Exportación</h4>", unsafe_allow_html=True)
-            st.write("Pule el documento final, valida requisitos y expórtalo a Word.")
-            st.write("")
-            if st.button("Iniciar Fase 3", type="primary", use_container_width=True, key="start_f3"):
-                st.info("La Fase 3 estará disponible próximamente.")
+    if not st.session_state.drive_service:
+        st.session_state.drive_service = build_drive_service(st.session_state.credentials)
+    
+    service = st.session_state.drive_service
+    if not service:
+        st.error("No se pudo conectar con Google Drive. Por favor, intenta volver a la página de inicio y reconectar.")
+        if st.button("← Volver a Inicio"):
+            st.session_state.credentials = None
+            go_to_landing()
+            st.rerun()
+        return
 
-    # --- Botón para volver a la página de inicio ---
-    st.write(""); st.write("")
-    _, col_back_center, _ = st.columns([2.5, 1, 2.5])
-    with col_back_center:
-        st.button("← Volver a Inicio", on_click=go_to_landing, use_container_width=True)
+    root_folder_id = find_or_create_folder(service, ROOT_FOLDER_NAME)
+    projects = list_project_folders(service, root_folder_id)
+    
+    with st.container(border=True):
+        st.subheader("1. Elige un proyecto existente")
+        if not projects:
+            st.info("Aún no tienes proyectos. Crea uno en el paso 2.")
+        else:
+            project_names = [""] + list(projects.keys())
+            selected_name = st.selectbox("Selecciona tu proyecto:", project_names)
+            if st.button("Cargar Proyecto Seleccionado", type="primary"):
+                if selected_name:
+                    st.session_state.selected_project = {"name": selected_name, "id": projects[selected_name]}
+                    st.toast(f"Proyecto '{selected_name}' cargado.")
+                    go_to_phase1()
+                    st.rerun()
+                else:
+                    st.warning("Por favor, selecciona un proyecto de la lista.")
+
+    with st.container(border=True):
+        st.subheader("2. O crea un nuevo proyecto")
+        new_project_name = st.text_input("Nombre del nuevo proyecto (ej: Licitación Metro Madrid 2024)")
+        if st.button("Crear y Empezar Nuevo Proyecto"):
+            if not new_project_name.strip():
+                st.warning("Por favor, introduce un nombre para el proyecto.")
+            elif new_project_name in projects:
+                st.error("Ya existe un proyecto con ese nombre. Por favor, elige otro.")
+            else:
+                with st.spinner(f"Creando carpeta para '{new_project_name}'..."):
+                    new_project_id = find_or_create_folder(service, new_project_name, parent_id=root_folder_id)
+                    st.session_state.selected_project = {"name": new_project_name, "id": new_project_id}
+                    st.success(f"¡Proyecto '{new_project_name}' creado!")
+                    go_to_phase1()
+                    st.rerun()
+
 
 # =============================================================================
-#                           PÁGINA 3: FASE 1 (CARGA)
+#                 PÁGINAS DE LA APLICACIÓN (NUEVA VERSIÓN)
 # =============================================================================
-def phase_1_page():
-    """Página para la carga de documentos de la Fase 1."""
-    st.markdown("<h3>FASE 1: Análisis y Estructura</h3>", unsafe_allow_html=True)
-    st.markdown("Carga los documentos base para que la IA genere y valide la estructura de la memoria técnica.")
+
+def landing_page():
+    """Pantalla de bienvenida que ahora incluye el inicio de sesión con Google."""
+    col1, col_center, col3 = st.columns([1, 2, 1])
+    with col_center:
+        st.write("")
+        st.markdown(f'<div style="text-align: center;"><img src="https://raw.githubusercontent.com/soporte2-tech/appfront/main/imagen.png" width="150"></div>', unsafe_allow_html=True)
+        st.write("")
+        st.markdown("<div style='text-align: center;'><h1>Asistente Inteligente para Memorias Técnicas</h1></div>", unsafe_allow_html=True)
+        st.markdown("<div style='text-align: center;'><h3>Optimiza y acelera la creación de tus propuestas de licitación</h3></div>", unsafe_allow_html=True)
+        st.markdown("---")
+        st.info("Para empezar, necesitas dar permiso a la aplicación para que gestione los proyectos en tu Google Drive.")
+        
+        # Generamos la URL de autenticación
+        flow = get_google_flow()
+        auth_url, _ = flow.authorization_url(prompt='consent')
+        
+        # Usamos st.link_button para una experiencia de usuario limpia
+        st.link_button("🔗 Conectar con Google Drive", auth_url, use_container_width=True, type="primary")
+
+def project_selection_page():
+    """Nueva página para seleccionar o crear un proyecto en Google Drive."""
+    st.markdown("<h3>Selección de Proyecto</h3>", unsafe_allow_html=True)
+    st.markdown("Elige un proyecto existente de tu Google Drive o crea uno nuevo para empezar.")
     st.markdown("---")
+    
+    # Construimos el servicio de Drive si no existe
+    if 'drive_service' not in st.session_state or not st.session_state.drive_service:
+        st.session_state.drive_service = build_drive_service(st.session_state.credentials)
+    
+    service = st.session_state.drive_service
+    # Manejo de error si el servicio no se puede crear
+    if not service:
+        st.error("No se pudo conectar con Google Drive. Por favor, intenta volver a la página de inicio y reconectar.")
+        if st.button("← Volver a Inicio"):
+            # Limpiamos las credenciales para forzar un nuevo login
+            for key in ['credentials', 'drive_service']:
+                if key in st.session_state:
+                    del st.session_state[key]
+            go_to_landing()
+            st.rerun()
+        return
+
+    # Buscamos o creamos la carpeta raíz y listamos los proyectos
+    with st.spinner("Accediendo a tu Google Drive..."):
+        root_folder_id = find_or_create_folder(service, ROOT_FOLDER_NAME)
+        projects = list_project_folders(service, root_folder_id)
+    
+    with st.container(border=True):
+        st.subheader("1. Elige un proyecto existente")
+        if not projects:
+            st.info("Aún no tienes proyectos. Crea uno nuevo en el paso 2.")
+        else:
+            # Añadimos una opción vacía para que el usuario deba elegir activamente
+            project_names = ["-- Selecciona un proyecto --"] + list(projects.keys())
+            selected_name = st.selectbox("Selecciona tu proyecto:", project_names)
+            
+            if st.button("Cargar Proyecto Seleccionado", type="primary"):
+                if selected_name != "-- Selecciona un proyecto --":
+                    st.session_state.selected_project = {"name": selected_name, "id": projects[selected_name]}
+                    st.toast(f"Proyecto '{selected_name}' cargado.")
+                    go_to_phase1()
+                    st.rerun()
+                else:
+                    st.warning("Por favor, selecciona un proyecto de la lista.")
+
+    with st.container(border=True):
+        st.subheader("2. O crea un nuevo proyecto")
+        new_project_name = st.text_input("Nombre del nuevo proyecto (ej: Licitación Metro Madrid 2024)", key="new_project_name_input")
+        if st.button("Crear y Empezar Nuevo Proyecto"):
+            if not new_project_name.strip():
+                st.warning("Por favor, introduce un nombre para el proyecto.")
+            elif new_project_name in projects:
+                st.error("Ya existe un proyecto con ese nombre. Por favor, elige otro.")
+            else:
+                with st.spinner(f"Creando carpeta '{new_project_name}' en tu Drive..."):
+                    new_project_id = find_or_create_folder(service, new_project_name, parent_id=root_folder_id)
+                    st.session_state.selected_project = {"name": new_project_name, "id": new_project_id}
+                    st.success(f"¡Proyecto '{new_project_name}' creado! Ya puedes cargar los documentos.")
+                    go_to_phase1()
+                    st.rerun()
+
+def phase_1_page():
+    """Página para la carga de documentos de la Fase 1, ahora vinculada a un proyecto."""
+    # Verificamos que hemos llegado aquí con un proyecto seleccionado
+    if not st.session_state.get('selected_project'):
+        st.warning("No se ha seleccionado ningún proyecto. Volviendo a la selección.")
+        go_to_project_selection()
+        st.rerun()
+
+    project_name = st.session_state.selected_project['name']
+    st.markdown(f"<h3>FASE 1: Análisis y Estructura</h3>", unsafe_allow_html=True)
+    st.info(f"Estás trabajando en el proyecto: **{project_name}**")
+    st.markdown("Carga los documentos base para que la IA genere la estructura de la memoria técnica.")
+    st.markdown("---")
+    
+    # Aquí puedes añadir la lógica para ver los archivos existentes en Drive si lo deseas.
+    # Por ahora, mantenemos la lógica de subida de archivos original para no complicarlo más.
     
     with st.container(border=True):
         st.subheader("PASO 1: Carga de Documentos")
         has_template = st.radio("¿Dispones de una plantilla?", ("No", "Sí"), horizontal=True, key="template_radio")
         
-        if 'uploaded_template' not in st.session_state: st.session_state.uploaded_template = None
+        # Usamos variables locales para los uploaders para evitar conflictos de estado
+        uploaded_template = None
         if has_template == 'Sí':
-            st.session_state.uploaded_template = st.file_uploader("Sube tu plantilla (DOCX/PDF)", type=['docx', 'pdf'], key="template_uploader")
+            uploaded_template = st.file_uploader("Sube tu plantilla (DOCX/PDF)", type=['docx', 'pdf'], key="template_uploader")
         
-        if 'uploaded_pliegos' not in st.session_state: st.session_state.uploaded_pliegos = None
-        st.session_state.uploaded_pliegos = st.file_uploader("Sube los Pliegos (DOCX/PDF)", type=['docx', 'pdf'], accept_multiple_files=True, key="pliegos_uploader")
+        uploaded_pliegos = st.file_uploader("Sube los Pliegos (DOCX/PDF)", type=['docx', 'pdf'], accept_multiple_files=True, key="pliegos_uploader")
 
     st.write("")
     if st.button("Generar Estructura", type="primary", use_container_width=True):
-        if not st.session_state.uploaded_pliegos:
+        if not uploaded_pliegos:
             st.warning("Por favor, sube al menos un archivo de Pliegos.")
         else:
+            # Esta es tu lógica original de llamada a la IA, que sigue siendo válida.
             with st.spinner("🧠 Analizando documentos y generando la estructura..."):
                 try:
+                    # (Aquí va tu código original para llamar a la IA... es idéntico al que tenías)
                     contenido_ia = []
                     texto_plantilla = ""
-                    if has_template == 'Sí' and st.session_state.uploaded_template is not None:
+                    if has_template == 'Sí' and uploaded_template is not None:
                         prompt_a_usar = PROMPT_PLANTILLA
-                        if st.session_state.uploaded_template.name.endswith('.docx'):
-                            doc = docx.Document(st.session_state.uploaded_template)
+                        if uploaded_template.name.endswith('.docx'):
+                            doc = docx.Document(uploaded_template)
                             texto_plantilla = "\n".join([p.text for p in doc.paragraphs])
-                        elif st.session_state.uploaded_template.name.endswith('.pdf'):
-                            reader = PdfReader(st.session_state.uploaded_template)
+                        elif uploaded_template.name.endswith('.pdf'):
+                            reader = PdfReader(uploaded_template)
                             texto_plantilla = "\n".join([page.extract_text() for page in reader.pages])
                     else:
                         prompt_a_usar = PROMPT_PLIEGOS
@@ -372,7 +566,11 @@ def phase_1_page():
                     if texto_plantilla:
                         contenido_ia.append(texto_plantilla)
                     
-                    for pliego in st.session_state.uploaded_pliegos:
+                    # Guardamos los archivos subidos en session_state para usarlos en la página de resultados
+                    st.session_state.uploaded_pliegos = uploaded_pliegos
+                    st.session_state.uploaded_template = uploaded_template
+
+                    for pliego in uploaded_pliegos:
                         contenido_ia.append({"mime_type": pliego.type, "data": pliego.getvalue()})
 
                     generation_config = genai.GenerationConfig(response_mime_type="application/json")
@@ -380,58 +578,57 @@ def phase_1_page():
                     
                     json_limpio_str = limpiar_respuesta_json(response.text)
                     if json_limpio_str:
-                        # --- CORRECCIÓN: AÑADIMOS TRY...EXCEPT AQUÍ ---
                         try:
                             informacion_estructurada = json.loads(json_limpio_str)
                             st.session_state.generated_structure = informacion_estructurada
-                            # Si todo va bien, navegamos a la página de resultados
                             go_to_phase1_results()
                             st.rerun()
                         except json.JSONDecodeError as json_error:
-                            # Si el JSON está mal formado, mostramos el error
-                            st.error("Error de formato en la respuesta de la IA. La estructura recibida no es un JSON válido.")
-                            st.error(f"Detalle técnico: {json_error}")
-                            st.text_area("Texto JSON con errores recibido de la IA:", json_limpio_str, height=300)
+                            st.error(f"Error de formato JSON: {json_error}")
+                            st.text_area("JSON con errores:", json_limpio_str, height=300)
                     else:
-                        st.error("La IA devolvió una respuesta vacía o en un formato no válido después de la limpieza.")
-                        st.text_area("Respuesta original recibida de la IA:", response.text, height=200)
+                        st.error("La IA devolvió una respuesta vacía o no válida.")
+                        st.text_area("Respuesta original de la IA:", response.text, height=200)
 
                 except Exception as e:
-                    st.error(f"Ocurrió un error general al contactar con la IA: {e}")
-                    if 'response' in locals() and hasattr(response, 'prompt_feedback'):
-                        st.error(f"Detalles del bloqueo de la API: {response.prompt_feedback}")
+                    st.error(f"Ocurrió un error al contactar con la IA: {e}")
 
     st.write("")
     st.markdown("---")
-    _, col_back_center, _ = st.columns([2.5, 1, 2.5])
-    with col_back_center:
-        st.button("← Volver al Menú de Fases", on_click=back_to_phases_and_cleanup, use_container_width=True, key="back_to_menu")
-# =============================================================================
-#                       PÁGINA 4: RESULTADOS FASE 1
-# =============================================================================
+    st.button("← Volver a Selección de Proyecto", on_click=back_to_project_selection_and_cleanup, use_container_width=True, key="back_to_projects")
+
+
 def phase_1_results_page():
+    """Página para revisar los resultados de la Fase 1."""
     st.markdown("<h3>FASE 1: Revisión de Resultados</h3>", unsafe_allow_html=True)
     st.markdown("Revisa el índice propuesto por la IA. Si es correcto, genera el guion estratégico.")
     st.markdown("---")
     st.button("← Volver a Cargar Archivos", on_click=go_to_phase1)
 
+    # Verificamos que tenemos datos generados para mostrar
+    if 'generated_structure' not in st.session_state or not st.session_state.generated_structure:
+        st.warning("No se ha generado ninguna estructura. Por favor, vuelve a la fase anterior y carga los documentos.")
+        return
+
     with st.container(border=True):
         mostrar_indice_desplegable(st.session_state.generated_structure.get('estructura_memoria'))
         st.markdown("---")
         st.subheader("Validación y Siguiente Paso")
-        feedback = st.text_area("Si necesitas cambios, indícalos aquí:", key="feedback_area")
+        feedback = st.text_area("Si necesitas cambios, indícalos aquí (función no implementada aún):", key="feedback_area")
         col_val_1, col_val_2 = st.columns(2)
         with col_val_1:
-            if st.button("Regenerar con Feedback", use_container_width=True, disabled=not feedback):
-                st.info("Funcionalidad de regeneración pendiente.")
+            st.button("Regenerar con Feedback", use_container_width=True, disabled=True)
         with col_val_2:
             if st.button("Aceptar y Generar Guion →", type="primary", use_container_width=True):
-                with st.spinner("✍️ Creando el guion estratégico... Este proceso puede tardar varios minutos."):
+                # Tu lógica original para generar el guion, que sigue siendo válida
+                with st.spinner("✍️ Creando el guion estratégico..."):
                     try:
+                        # (Aquí va tu código original para llamar a la IA para el guion... es idéntico al que tenías)
                         contenido_ia_preguntas = [PROMPT_PREGUNTAS_TECNICAS]
                         contenido_ia_preguntas.append("--- ESTRUCTURA VALIDADA (JSON) ---\n" + json.dumps(st.session_state.generated_structure, indent=2))
-                        for pliego in st.session_state.uploaded_pliegos:
-                            contenido_ia_preguntas.append({"mime_type": pliego.type, "data": pliego.getvalue()})
+                        if st.session_state.get('uploaded_pliegos'):
+                            for pliego in st.session_state.uploaded_pliegos:
+                                contenido_ia_preguntas.append({"mime_type": pliego.type, "data": pliego.getvalue()})
                         if st.session_state.get('uploaded_template'):
                             contenido_ia_preguntas.append({"mime_type": st.session_state.uploaded_template.type, "data": st.session_state.uploaded_template.getvalue()})
 
@@ -446,21 +643,46 @@ def phase_1_results_page():
                         doc_io.seek(0)
                         st.session_state.word_file = doc_io.getvalue()
                         
-                        st.success("¡Documento Word generado! Ya puedes descargarlo a continuación.")
+                        st.success("¡Documento Word generado!")
                     except Exception as e:
                         st.error(f"Ocurrió un error al generar el guion: {e}")
-                        if 'response_preguntas' in locals() and hasattr(response_preguntas, 'prompt_feedback'): st.error(f"Detalles del bloqueo: {response_preguntas.prompt_feedback}")
 
-    if 'word_file' in st.session_state:
+    if 'word_file' in st.session_state and st.session_state.word_file:
         st.markdown("---")
         with st.container(border=True):
             st.subheader("Descarga del Resultado Final")
-            st.download_button(label="📥 Descargar Guion Estratégico (.docx)", data=st.session_state.word_file, file_name="guion_estrategico.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document", use_container_width=True)
+            st.download_button(
+                label="📥 Descargar Guion Estratégico (.docx)",
+                data=st.session_state.word_file,
+                file_name="guion_estrategico.docx",
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                use_container_width=True
+            )
 
 # =============================================================================
-#                        LÓGICA PRINCIPAL (ROUTER)
+#                        LÓGICA PRINCIPAL (ROUTER) - VERSIÓN CORRECTA
 # =============================================================================
-if st.session_state.page == 'landing': landing_page()
-elif st.session_state.page == 'phases': phases_page()
-elif st.session_state.page == 'phase_1': phase_1_page()
-elif st.session_state.page == 'phase_1_results': phase_1_results_page()
+
+# Primero, SIEMPRE comprobamos si tenemos credenciales de usuario.
+credentials = get_credentials()
+
+# Si NO hay credenciales, el usuario no ha iniciado sesión.
+if not credentials:
+    # La única página que puede ver es la de bienvenida para que inicie sesión.
+    landing_page()
+
+# Si SÍ hay credenciales, el usuario ya ha iniciado sesión.
+else:
+    # Ahora que sabemos que está dentro, miramos en qué página quiere estar.
+    # Si acaba de iniciar sesión, su 'page' será 'landing', así que lo llevamos
+    # a la selección de proyectos.
+    if st.session_state.page == 'landing' or st.session_state.page == 'project_selection':
+        project_selection_page()
+    
+    elif st.session_state.page == 'phase_1':
+        phase_1_page()
+        
+    elif st.session_state.page == 'phase_1_results':
+        phase_1_results_page()
+        
+    # La página 'phases' ya no existe en este nuevo flujo, por eso no se incluye.
