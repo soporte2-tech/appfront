@@ -22,7 +22,12 @@ import google_auth_httplib2
 # =============================================================================
 
 # --- CONFIGURACIÓN DE GOOGLE OAUTH Y DRIVE ---
-SCOPES = ['https://www.googleapis.com/auth/drive', 'https://www.googleapis.com/auth/gmail.send']
+SCOPES = [
+    'https://www.googleapis.com/auth/drive',
+    'https://www.googleapis.com/auth/gmail.send',
+    'https://www.googleapis.com/auth/userinfo.profile', # <-- Añadir este
+    'https://www.googleapis.com/auth/userinfo.email'   # <-- Y este
+]
 CLIENT_CONFIG = {
     "web": {
         "client_id": st.secrets["GOOGLE_CLIENT_ID"],
