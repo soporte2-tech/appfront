@@ -22,12 +22,13 @@ import google_auth_httplib2
 #           BLOQUE COMPLETO DE CONFIGURACIÓN Y FUNCIONES DE DRIVE
 # =============================================================================
 
-# --- CONFIGURACIÓN DE GOOGLE OAUTH Y DRIVE ---
+
 SCOPES = [
     'https://www.googleapis.com/auth/drive',
     'https://www.googleapis.com/auth/gmail.send',
-    'https://www.googleapis.com/auth/userinfo.profile', # <-- Añadir este
-    'https://www.googleapis.com/auth/userinfo.email'   # <-- Y este
+    'https://www.googleapis.com/auth/userinfo.profile',
+    'https://www.googleapis.com/auth/userinfo.email',
+    'openid'  # <-- ESTE ES EL SCOPE QUE FALTABA
 ]
 CLIENT_CONFIG = {
     "web": {
