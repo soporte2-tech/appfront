@@ -591,6 +591,7 @@ def go_to_phase1(): st.session_state.page = 'phase_1'
 def go_to_phase1_results(): st.session_state.page = 'phase_1_results'
 def go_to_phase2():
     st.session_state.page = 'phase_2'
+def go_to_phase3(): st.session_state.page = 'phase_3'
 
 def back_to_project_selection_and_cleanup():
     for key in ['generated_structure', 'word_file', 'uploaded_template', 'uploaded_pliegos', 'selected_project']:
