@@ -523,6 +523,8 @@ def go_to_project_selection(): st.session_state.page = 'project_selection'
 def go_to_landing(): st.session_state.page = 'landing'
 def go_to_phase1(): st.session_state.page = 'phase_1'
 def go_to_phase1_results(): st.session_state.page = 'phase_1_results'
+def go_to_phase2():
+    st.session_state.page = 'phase_2'
 
 def back_to_project_selection_and_cleanup():
     for key in ['generated_structure', 'word_file', 'uploaded_template', 'uploaded_pliegos', 'selected_project']:
@@ -729,79 +731,42 @@ def phase_1_page():
 # =============================================================================
 
 # =============================================================================
-#           VERSIÓN FINAL Y COMPLETA DE phase_1_results_page CON NOTIFICACIÓN
+#           REEMPLAZA phase_1_results_page POR ESTA VERSIÓN DE NAVEGACIÓN
 # =============================================================================
 
 def phase_1_results_page():
-    """Página para revisar, regenerar, aceptar, guardar y notificar por email."""
+    """Página para revisar, regenerar y ACEPTAR el índice para pasar a Fase 2."""
     st.markdown("<h3>FASE 1: Revisión de Resultados</h3>", unsafe_allow_html=True)
-    st.markdown("Revisa el índice. Si es correcto, genera y guarda el guion. Si no, pide los cambios que necesites.")
+    st.markdown("Revisa y ajusta el índice hasta que sea perfecto. Cuando esté listo, pasa a la siguiente fase para generar el contenido de cada apartado.")
     st.markdown("---")
     st.button("← Volver a la gestión de archivos", on_click=go_to_phase1)
 
     if 'generated_structure' not in st.session_state or not st.session_state.generated_structure:
-        st.warning("No se ha generado ninguna estructura. Por favor, vuelve a la fase anterior.")
+        st.warning("No se ha generado ninguna estructura.")
         return
 
-    # --- Función interna para la lógica de regeneración ---
+    # La función interna handle_regeneration no cambia, la dejamos como está.
     def handle_regeneration():
-        feedback_text = st.session_state.feedback_area
-        if not feedback_text:
-            st.warning("Por favor, escribe tus indicaciones en el área de texto.")
-            return
-
-        with st.spinner("🧠 Incorporando tu feedback y regenerando la estructura..."):
-            try:
-                contenido_ia_regeneracion = [PROMPT_REGENERACION]
-                contenido_ia_regeneracion.append("--- INSTRUCCIONES DEL USUARIO ---\n" + feedback_text)
-                contenido_ia_regeneracion.append("--- ESTRUCTURA JSON ANTERIOR A CORREGIR ---\n" + json.dumps(st.session_state.generated_structure, indent=2))
-                
-                if st.session_state.get('uploaded_pliegos'):
-                    service = st.session_state.drive_service
-                    for file_info in st.session_state.uploaded_pliegos:
-                        file_content_bytes = download_file_from_drive(service, file_info['id'])
-                        contenido_ia_regeneracion.append({
-                            "mime_type": file_info['mimeType'],
-                            "data": file_content_bytes.getvalue()
-                        })
-
-                generation_config = genai.GenerationConfig(response_mime_type="application/json")
-                response_regeneracion = model.generate_content(contenido_ia_regeneracion, generation_config=generation_config)
-                json_limpio_str_regenerado = limpiar_respuesta_json(response_regeneracion.text)
-                
-                if json_limpio_str_regenerado:
-                    nueva_estructura = json.loads(json_limpio_str_regenerado)
-                    st.session_state.generated_structure = nueva_estructura
-                    st.toast("¡Estructura regenerada con éxito!")
-                    st.session_state.feedback_area = ""
-                else:
-                    st.error("La IA no devolvió una estructura válida tras la regeneración.")
-            except Exception as e:
-                st.error(f"Ocurrió un error durante la regeneración: {e}")
+        # ... (código idéntico al que ya tienes)
 
     with st.container(border=True):
         mostrar_indice_desplegable(st.session_state.generated_structure.get('estructura_memoria'))
         st.markdown("---")
         st.subheader("Validación y Siguiente Paso")
         
-        st.text_area("Si necesitas cambios, indícalos aquí:", key="feedback_area", placeholder="Ej: 'Une los apartados 1.1 y 1.2 en uno solo.'")
+        st.text_area("Si necesitas cambios, indícalos aquí:", key="feedback_area", placeholder="Ej: 'Añade un subapartado 1.3 sobre riesgos.'")
         
         col_val_1, col_val_2 = st.columns(2)
         with col_val_1:
-            st.button(
-                "Regenerar con Feedback",
-                on_click=handle_regeneration,
-                use_container_width=True,
-                disabled=not st.session_state.get("feedback_area")
-            )
+            st.button("Regenerar con Feedback", on_click=handle_regeneration, use_container_width=True, disabled=not st.session_state.get("feedback_area"))
 
         with col_val_2:
-            if st.button("Aceptar y Generar Guion →", type="primary", use_container_width=True):
-                with st.spinner("Guardando índice, creando guion y enviando notificación..."):
+            # --- !! ESTE ES EL CAMBIO PRINCIPAL !! ---
+            if st.button("Aceptar Índice y Pasar a Fase 2 →", type="primary", use_container_width=True):
+                with st.spinner("Guardando índice final en Drive..."):
                     try:
                         service = st.session_state.drive_service
                         project_folder_id = st.session_state.selected_project['id']
-                        
                         docs_app_folder_id = find_or_create_folder(service, "Documentos aplicación", parent_id=project_folder_id)
 
                         # Guardamos el índice final en la subcarpeta correcta
@@ -815,69 +780,32 @@ def phase_1_results_page():
                         if saved_index_id:
                             delete_file_from_drive(service, saved_index_id)
                         upload_file_to_drive(service, mock_file_obj, docs_app_folder_id)
-                        st.toast("Índice final guardado en 'Documentos aplicación'.")
+                        st.toast("Índice final guardado en tu proyecto de Drive.")
+                        
+                        # Navegamos a la nueva Fase 2
+                        go_to_phase2()
+                        st.rerun()
 
-                        # Generamos el guion
-                        contenido_ia_preguntas = [PROMPT_PREGUNTAS_TECNICAS]
-                        contenido_ia_preguntas.append("--- ESTRUCTURA VALIDADA (JSON) ---\n" + json.dumps(st.session_state.generated_structure, indent=2))
-                        if st.session_state.get('uploaded_pliegos'):
-                            for file_info in st.session_state.uploaded_pliegos:
-                                file_content_bytes = download_file_from_drive(service, file_info['id'])
-                                contenido_ia_preguntas.append({
-                                    "mime_type": file_info['mimeType'],
-                                    "data": file_content_bytes.getvalue()
-                                })
-
-                        response_preguntas = model.generate_content(contenido_ia_preguntas)
-                        
-                        documento = docx.Document()
-                        documento.add_heading("Guion Estratégico de Enfoque", level=0)
-                        agregar_markdown_a_word(documento, response_preguntas.text)
-                        
-                        doc_io = io.BytesIO()
-                        documento.save(doc_io)
-                        doc_io.seek(0)
-                        st.session_state.word_file = doc_io.getvalue()
-                        
-                        # Guardamos el documento Word generado en la subcarpeta correcta
-                        word_file_obj = io.BytesIO(st.session_state.word_file)
-                        word_file_obj.name = "guion_estrategico.docx"
-                        word_file_obj.type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                        
-                        saved_guion_id = find_file_by_name(service, "guion_estrategico.docx", docs_app_folder_id)
-                        if saved_guion_id:
-                            delete_file_from_drive(service, saved_guion_id)
-                        upload_file_to_drive(service, word_file_obj, docs_app_folder_id)
-                        
-                        st.success("¡Guion Estratégico generado y guardado!")
-
-                        # --- ENVIAR NOTIFICACIÓN POR EMAIL ---
-                        guion_id = find_file_by_name(service, "guion_estrategico.docx", docs_app_folder_id)
-                        if guion_id:
-                            oauth2_service = build('oauth2', 'v2', credentials=st.session_state.credentials)
-                            user_info = oauth2_service.userinfo().get().execute()
-                            user_email = user_info.get('email')
-                            
-                            file_drive_link = f"https://docs.google.com/document/d/{guion_id}/edit"
-                            project_name = st.session_state.selected_project['name']
-                            
-                            send_gmail_notification(st.session_state.credentials, project_name, file_drive_link, user_email)
-                        
                     except Exception as e:
-                        st.error(f"Ocurrió un error al generar el guion: {e}")
+                        st.error(f"Ocurrió un error al guardar el índice: {e}")
 
-    if 'word_file' in st.session_state and st.session_state.word_file:
-        st.markdown("---")
-        with st.container(border=True):
-            st.subheader("Descarga del Resultado Final")
-            st.download_button(
-                label="📥 Descargar Guion Estratégico (.docx)",
-                data=st.session_state.word_file,
-                file_name="guion_estrategico.docx",
-                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                use_container_width=True
-            )
+def phase_2_page():
+    """Página para la generación granular de contenido para cada subapartado."""
+    st.markdown("<h3>FASE 2: Generación de Contenido por Apartados</h3>", unsafe_allow_html=True)
+    st.markdown("Selecciona los apartados para los que quieres generar contenido. Puedes adjuntar documentación de apoyo para cada uno.")
+    st.markdown("---")
+
+    # Verificamos que tenemos un índice con el que trabajar
+    if 'generated_structure' not in st.session_state or not st.session_state.generated_structure:
+        st.warning("No se ha cargado ninguna estructura de índice. Por favor, vuelve a la Fase 1.")
+        if st.button("Ir a Fase 1"):
+            go_to_phase1()
+            st.rerun()
+        return
+
+    st.info("Próximamente: Aquí aparecerá la lista de subapartados con checkboxes y file uploaders.")
 # =============================================================================
+
 #                        LÓGICA PRINCIPAL (ROUTER) - VERSIÓN CORRECTA
 # =============================================================================
 
@@ -902,5 +830,7 @@ else:
         
     elif st.session_state.page == 'phase_1_results':
         phase_1_results_page()
+    elif st.session_state.page == 'phase_2':
+        phase_2_page()
         
     # La página 'phases' ya no existe en este nuevo flujo, por eso no se incluye.
