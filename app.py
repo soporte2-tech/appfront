@@ -499,7 +499,7 @@ def project_selection_page():
 # =============================================================================
 
 def phase_1_page():
-    """Página de Fase 1 con gestión completa de archivos e índices en Drive."""
+    """Página de Fase 1 con gestión completa y lógica de estado corregida."""
     if not st.session_state.get('selected_project'):
         st.warning("No se ha seleccionado ningún proyecto. Volviendo a la selección.")
         go_to_project_selection()
@@ -512,35 +512,28 @@ def phase_1_page():
     st.markdown(f"<h3>FASE 1: Análisis y Estructura</h3>", unsafe_allow_html=True)
     st.info(f"Estás trabajando en el proyecto: **{project_name}**")
 
-    # Re-evaluamos los archivos existentes cada vez que se carga la página
+    # Gestión de archivos (esta parte ya funciona bien)
     existing_files = get_files_in_project(service, project_folder_id)
     document_files = [f for f in existing_files if f['name'] != 'ultimo_indice.json']
     
-    # --- VISTA DE ARCHIVOS EXISTENTES (SI LOS HAY) ---
     if document_files:
         st.success("Hemos encontrado estos archivos en tu Drive para este proyecto:")
         with st.container(border=True):
-            cols = st.columns([4, 1])
-            for i, file in enumerate(document_files):
+            for file in document_files:
+                cols = st.columns([4, 1])
                 cols[0].write(f"📄 **{file['name']}**")
-                # Botón de eliminar con una clave única para cada archivo
                 if cols[1].button("Eliminar", key=f"del_{file['id']}", type="secondary"):
                     with st.spinner(f"Eliminando '{file['name']}'..."):
                         if delete_file_from_drive(service, file['id']):
                             st.toast(f"Archivo '{file['name']}' eliminado.")
-                            st.rerun() # Recargamos para actualizar la lista
-                        else:
-                            st.error("No se pudo eliminar el archivo.")
+                            st.rerun()
     else:
         st.info("Este proyecto aún no tiene documentos. Sube los archivos base a continuación.")
 
-    # --- ZONA PARA AÑADIR/SUBIR NUEVOS ARCHIVOS ---
     with st.expander("Añadir o reemplazar documentación", expanded=not document_files):
         with st.container(border=True):
             st.subheader("Subir nuevos documentos")
-            has_template = st.radio("¿El nuevo archivo es una plantilla?", ("No", "Sí"), horizontal=True, key="template_radio")
             new_files_uploader = st.file_uploader("Arrastra aquí los nuevos Pliegos o Plantilla", type=['docx', 'pdf'], accept_multiple_files=True, key="new_files_uploader")
-            
             if st.button("Guardar nuevos archivos en Drive"):
                 if new_files_uploader:
                     with st.spinner("Subiendo archivos a tu proyecto en Drive..."):
@@ -551,37 +544,32 @@ def phase_1_page():
                     st.warning("Por favor, selecciona al menos un archivo para subir.")
 
     st.markdown("---")
-
-    # --- GESTIÓN Y GENERACIÓN DE ÍNDICES ---
     st.header("Análisis y Generación de Índice")
 
-    # Comprobamos si existe un índice guardado
+    # --- !! COMIENZO DE LA LÓGICA CORREGIDA !! ---
+    
     saved_index_id = find_file_by_name(service, "ultimo_indice.json", project_folder_id)
 
-    if saved_index_id:
-        st.info("Hemos encontrado un índice generado anteriormente para este proyecto.")
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("Cargar último índice generado", use_container_width=True):
-                with st.spinner("Cargando índice desde Drive..."):
-                    index_content_bytes = download_file_from_drive(service, saved_index_id)
-                    index_data = json.loads(index_content_bytes.getvalue().decode('utf-8'))
-                    st.session_state.generated_structure = index_data
-                    st.session_state.uploaded_pliegos = document_files # Pasamos los archivos para el guion
-                    go_to_phase1_results()
-                    st.rerun()
-        with col2:
-            st.button("Generar un nuevo índice desde cero", type="primary", use_container_width=True, key="generate_new_anyway")
-    
-    # Si no hay índice guardado, o si el usuario quiere generar uno nuevo
-    if not saved_index_id or st.session_state.get("generate_new_anyway"):
-        if not document_files:
-             st.warning("Debes subir documentos antes de poder generar un índice.")
-        elif st.button("Analizar Archivos y Generar Índice", type="primary", use_container_width=True, key="generate_from_docs"):
+    # Creamos las columnas para los botones de acción
+    col1, col2 = st.columns(2)
+
+    # Botón para cargar el índice existente (si existe)
+    with col1:
+        if st.button("Cargar último índice generado", use_container_width=True, disabled=not saved_index_id):
+            with st.spinner("Cargando índice desde Drive..."):
+                index_content_bytes = download_file_from_drive(service, saved_index_id)
+                index_data = json.loads(index_content_bytes.getvalue().decode('utf-8'))
+                st.session_state.generated_structure = index_data
+                st.session_state.uploaded_pliegos = document_files
+                go_to_phase1_results()
+                st.rerun()
+
+    # Botón para analizar y generar un nuevo índice (siempre disponible si hay documentos)
+    with col2:
+        if st.button("Analizar Archivos y Generar Nuevo Índice", type="primary", use_container_width=True, disabled=not document_files):
             with st.spinner("Descargando archivos de Drive y analizando..."):
                 try:
                     downloaded_files_for_ia = []
-                    # (Lógica de descarga y llamada a la IA, similar a la anterior)
                     for file in document_files:
                         file_content_bytes = download_file_from_drive(service, file['id'])
                         downloaded_files_for_ia.append({"mime_type": file['mimeType'], "data": file_content_bytes.getvalue()})
@@ -596,25 +584,15 @@ def phase_1_page():
                     if json_limpio_str:
                         informacion_estructurada = json.loads(json_limpio_str)
                         st.session_state.generated_structure = informacion_estructurada
-
-                        # Guardamos el nuevo índice en Drive
-                        json_bytes = json.dumps(informacion_estructurada, indent=2).encode('utf-8')
-                        mock_file_obj = io.BytesIO(json_bytes)
-                        mock_file_obj.name = "ultimo_indice.json"
-                        mock_file_obj.type = "application/json"
-                        
-                        # Si ya existía, lo borramos para reemplazarlo
-                        if saved_index_id:
-                            delete_file_from_drive(service, saved_index_id)
-                        upload_file_to_drive(service, mock_file_obj, project_folder_id)
-
-                        st.session_state.uploaded_pliegos = document_files # Pasamos los archivos para el guion
+                        st.session_state.uploaded_pliegos = document_files
                         go_to_phase1_results()
                         st.rerun()
                     else:
                         st.error("La IA devolvió una respuesta vacía o no válida.")
                 except Exception as e:
                     st.error(f"Ocurrió un error: {e}")
+
+    # --- !! FIN DE LA LÓGICA CORREGIDA !! ---
 
     st.write("")
     st.markdown("---")
