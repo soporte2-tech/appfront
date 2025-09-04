@@ -731,7 +731,7 @@ def phase_1_page():
 # =============================================================================
 
 # =============================================================================
-#           REEMPLAZA phase_1_results_page POR ESTA VERSIÓN DE NAVEGACIÓN
+#           REEMPLAZA phase_1_results_page POR ESTA VERSIÓN COMPLETA
 # =============================================================================
 
 def phase_1_results_page():
@@ -745,9 +745,42 @@ def phase_1_results_page():
         st.warning("No se ha generado ninguna estructura.")
         return
 
-    # La función interna handle_regeneration no cambia, la dejamos como está.
+    # --- FUNCIÓN INTERNA COMPLETA ---
     def handle_regeneration():
-        # ... (código idéntico al que ya tienes)
+        feedback_text = st.session_state.feedback_area
+        if not feedback_text:
+            st.warning("Por favor, escribe tus indicaciones en el área de texto.")
+            return
+
+        with st.spinner("🧠 Incorporando tu feedback y regenerando la estructura..."):
+            try:
+                contenido_ia_regeneracion = [PROMPT_REGENERACION]
+                contenido_ia_regeneracion.append("--- INSTRUCCIONES DEL USUARIO ---\n" + feedback_text)
+                contenido_ia_regeneracion.append("--- ESTRUCTURA JSON ANTERIOR A CORREGIR ---\n" + json.dumps(st.session_state.generated_structure, indent=2))
+                
+                if st.session_state.get('uploaded_pliegos'):
+                    service = st.session_state.drive_service
+                    for file_info in st.session_state.uploaded_pliegos:
+                        file_content_bytes = download_file_from_drive(service, file_info['id'])
+                        contenido_ia_regeneracion.append({
+                            "mime_type": file_info['mimeType'],
+                            "data": file_content_bytes.getvalue()
+                        })
+
+                generation_config = genai.GenerationConfig(response_mime_type="application/json")
+                response_regeneracion = model.generate_content(contenido_ia_regeneracion, generation_config=generation_config)
+                json_limpio_str_regenerado = limpiar_respuesta_json(response_regeneracion.text)
+                
+                if json_limpio_str_regenerado:
+                    nueva_estructura = json.loads(json_limpio_str_regenerado)
+                    st.session_state.generated_structure = nueva_estructura
+                    st.toast("¡Estructura regenerada con éxito!")
+                    st.session_state.feedback_area = ""
+                else:
+                    st.error("La IA no devolvió una estructura válida tras la regeneración.")
+            except Exception as e:
+                st.error(f"Ocurrió un error durante la regeneración: {e}")
+    # --- FIN DE LA FUNCIÓN INTERNA ---
 
     with st.container(border=True):
         mostrar_indice_desplegable(st.session_state.generated_structure.get('estructura_memoria'))
@@ -761,7 +794,6 @@ def phase_1_results_page():
             st.button("Regenerar con Feedback", on_click=handle_regeneration, use_container_width=True, disabled=not st.session_state.get("feedback_area"))
 
         with col_val_2:
-            # --- !! ESTE ES EL CAMBIO PRINCIPAL !! ---
             if st.button("Aceptar Índice y Pasar a Fase 2 →", type="primary", use_container_width=True):
                 with st.spinner("Guardando índice final en Drive..."):
                     try:
@@ -769,7 +801,6 @@ def phase_1_results_page():
                         project_folder_id = st.session_state.selected_project['id']
                         docs_app_folder_id = find_or_create_folder(service, "Documentos aplicación", parent_id=project_folder_id)
 
-                        # Guardamos el índice final en la subcarpeta correcta
                         indice_final = st.session_state.generated_structure
                         json_bytes = json.dumps(indice_final, indent=2).encode('utf-8')
                         mock_file_obj = io.BytesIO(json_bytes)
@@ -782,28 +813,11 @@ def phase_1_results_page():
                         upload_file_to_drive(service, mock_file_obj, docs_app_folder_id)
                         st.toast("Índice final guardado en tu proyecto de Drive.")
                         
-                        # Navegamos a la nueva Fase 2
                         go_to_phase2()
                         st.rerun()
 
                     except Exception as e:
                         st.error(f"Ocurrió un error al guardar el índice: {e}")
-
-def phase_2_page():
-    """Página para la generación granular de contenido para cada subapartado."""
-    st.markdown("<h3>FASE 2: Generación de Contenido por Apartados</h3>", unsafe_allow_html=True)
-    st.markdown("Selecciona los apartados para los que quieres generar contenido. Puedes adjuntar documentación de apoyo para cada uno.")
-    st.markdown("---")
-
-    # Verificamos que tenemos un índice con el que trabajar
-    if 'generated_structure' not in st.session_state or not st.session_state.generated_structure:
-        st.warning("No se ha cargado ninguna estructura de índice. Por favor, vuelve a la Fase 1.")
-        if st.button("Ir a Fase 1"):
-            go_to_phase1()
-            st.rerun()
-        return
-
-    st.info("Próximamente: Aquí aparecerá la lista de subapartados con checkboxes y file uploaders.")
 # =============================================================================
 
 #                        LÓGICA PRINCIPAL (ROUTER) - VERSIÓN CORRECTA
