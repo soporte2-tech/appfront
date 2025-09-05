@@ -440,7 +440,73 @@ PROMPT_DESARROLLO = """
     5.1 Está prohibido poner explícitamente algo de cómo ha sido la estructura o que hay referencias de prompts como "(referencia a PROMPT_1_1_B)". Si tienes que poner alguna referencia de algún sitio pon el apartado. Si no sabes que apartado es, opta por no poner nada de la referencia. No pueden detectar que este trabajo ha sido realizado con IA.
     6. No dudes en añadir tablas que resuman el contenido. Debes usar bullet points y listas para dar las ideas de una manera más clara para que el lector se sienta cómodo al leerlo. Lo ideal es que haya un número coherente de tablas, listados y elementos htmls sin resultar repetitivo. Siempre siguiendo un balance de 75% texto normal y 25% tablas, elementos gráficos html y listas fáciles de ver.
     7. Evita las conclusiones si van a ser redundantes. Suelen ser un sintoma de que se usa IA, así que saltatelas o no las empieces con expresiones como 'En definitiva' o 'En conclusión'. El objetivo es ser ameno y directo, y este tipo de secciones impiden llegar a ese objetivo.
-    8. Finalmente, si consideras que la sección se podría resumir con un buen elemento visual, genera el código para un **único y completo archivo HTML auto-contenido**. Tu respuesta DEBE empezar con `<!DOCTYPE html>` y contener las etiquetas `<html>`, `<head>`, `<body>` y `<style>`. **TODO el CSS debe ir dentro de la etiqueta `<style>` en el `<head>`**. No incluyas explicaciones, solo el código HTML puro. El objetivo es que de este HTML se genere una imagen PNG para un documento Word, así que diséñalo para que se vea bien en un ancho de aproximadamente 800px. Usa la letra 'Urbansit' y los colores #0046C6, #EDE646, #32CFAA, #C2D1F2, #EB0045. Crea diseños minimalistas, muy visuales, con poco texto y sin emoticonos.
+    8. **REGLA DE ORO PARA ELEMENTOS VISUALES:** Si necesitas crear un elemento visual, DEBES generar un archivo HTML completo y auto-contenido. NO PUEDES generar solo CSS. Tu respuesta DEBE ser únicamente el código HTML, empezando con `<!DOCTYPE html>`. OBLIGATORIAMENTE, usa la siguiente plantilla base y solo modifica el contenido de los placeholders `<!-- TÍTULO AQUÍ -->` y `<!-- LISTA DE ELEMENTOS AQUÍ -->`. No alteres la estructura ni el CSS.
+
+        ```html
+        <!DOCTYPE html>
+        <html lang="es">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Visual Element</title>
+            <style>
+                @import url('https://fonts.googleapis.com/css2?family=Urbanist:wght@400;600;700&display=swap');
+                body {
+                    font-family: 'Urbanist', sans-serif;
+                    background-color: #f0f2f5;
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    padding: 20px;
+                    width: 800px;
+                    box-sizing: border-box;
+                }
+                .card {
+                    background-color: white;
+                    border-radius: 10px;
+                    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+                    padding: 25px;
+                    width: 100%;
+                    max-width: 750px;
+                    border-top: 5px solid #0046C6;
+                }
+                h2 {
+                    color: #0046C6;
+                    text-align: center;
+                    margin-top: 0;
+                    font-size: 24px;
+                    font-weight: 700;
+                }
+                ul {
+                    list-style-type: none;
+                    padding: 0;
+                }
+                li {
+                    display: flex;
+                    align-items: center;
+                    margin-bottom: 15px;
+                    font-size: 16px;
+                    color: #333;
+                }
+                li::before {
+                    content: '✔';
+                    color: #32CFAA;
+                    font-size: 20px;
+                    font-weight: bold;
+                    margin-right: 15px;
+                }
+            </style>
+        </head>
+        <body>
+            <div class="card">
+                <h2><!-- TÍTULO AQUÍ --></h2>
+                <ul>
+                    <!-- LISTA DE ELEMENTOS AQUÍ (usa <li>Elemento 1</li>, <li>Elemento 2</li>, etc.) -->
+                </ul>
+            </div>
+        </body>
+        </html>
+        ```    
     9. Debes cumplir todos los criterios pero sin mencionar que tu objetivo es cumplirlos. Es decir, debes hacer lo que se valora pero sin decir que esa sección existe para cumplir con un criterio. La redacción y el parafraseo debe ser muy elegante para demostrar un dominio y cumplimiento de los objetivos sin sonar pesado.
     10. No uses recursos como el ;, los : y ese tipo de expresiones que parecen hechas con IA. Tampoco uses expresiones precedidas por -. Debes prafasear mucho. Tu texto debe parecer natural sin perder la profesionalidad.
     11. Debes establecer el mismo idioma para todas las redacciones. Este idioma debe ser el castellano.
@@ -453,7 +519,7 @@ PROMPT_DESARROLLO = """
     18. No comiences los párrafos de los subapartados mencionando el nombre de la empresa y su compromiso con no se que "DPI Estrategia, en su compromiso con la transparencia y la rendición de cuentas, elaborará y entregará una memoria final completa al término de los doce meses del programa.". Usa mejor una introducción más limpia que no mencione el nombre de la empresa y que diga "A modo de cerrar el servicio, se cerrará con una memoria final. Esta memoria final incluirá...".
     19. No menciones el nombre de la empresa que se presenta a la licitación todo el rato. Ya se sabe que es la empresa, no hace falta ponerlo tan repetidamente.
     20. NO PONGAS NUNCA los títulos las primeras letras de las palabras en mayusculas. Es decir si la frase es "El Enfoque Nativo en la Nube y la IA" ponlo así "El enfoque nativo en la nube y la IA". Cuida mucho eso en tu redacción es fundamental.
-
+    21. ESTÁ PROHIBIDO GENERAR PROMPTS QUE INCLUYAN INSTRUCCIONES O MARCADORES DE POSICIÓN como '[Completa aquí]' o '[Ajusta la tabla]'. El prompt debe contener toda la información para que el redactor final genere el texto completo, no para que le dé instrucciones.
 
     Estructura obligatoria para cada prompt: Cada prompt debe comenzar indicando con claridad qué apartado se va a redactar y cuál es el objetivo específico de ese apartado dentro de la memoria. A continuación, debe definir el rango o número aproximado de palabras que debe ocupar el texto. Seguidamente, se incluirá una explicación de contexto general de la dictación, detallando todos los puntos y requisitos que se deben cubrir en ese apartado. Después, se aportará un contexto concreto de la empresa, para cumplir esos requisitos presentando la propuesta de la empresa totalmente personalizada a sus fortalezas . Finalmente, el prompt debe cerrar con una lista de matices o consideraciones importantes para la redacción (tono, estilo, prohibiciones, obligatoriedades, etc.) las cuáles hemos pautado anteriormente cuando mencionamos las reglas, que sirvan como guía de calidad y eviten errores habituales.
 
@@ -1429,11 +1495,13 @@ def phase_4_page(model):
         # Contexto inicial para el chat
         prompt_inicial = """
         Eres un consultor experto redactando memorias técnicas para licitaciones. Tu única misión es redactar el contenido que te solicite.
-        Tu salida debe ser exclusivamente el texto solicitado, ya sea en formato Markdown o en código HTML completo si el prompt lo pide explícitamente.
+        Tu salida debe ser exclusivamente el texto solicitado, ya sea en formato Markdown o en código HTML completo.
         El objetivo es un informe claro, muy visual, directo y de lectura amena.
         No añadas títulos a menos que el prompt indique que es un nuevo subapartado (usando ## o ###).
-        Recuerda el toque humano, la coherencia y evita formalismos excesivos. Usa comas en lugar de punto y coma, y paréntesis en lugar de guiones para aclaraciones.
-        Evita clichés como 'referente indiscutible' o 'vibrante ecosistema'. Céntrate en explicar las cosas y en demostrar valor con explicaciones concisas y profesionales.
+        Recuerda el toque humano, la coherencia y evita formalismos excesivos.
+        Evita clichés como 'referente indiscutible' o 'vibrante ecosistema'.
+        
+        REGLA DE ORO: Está estrictamente prohibido que dejes texto por completar o que incluyas marcadores de posición como '[Completa con información...]' o '[Ajusta la tabla...]'. Debes generar siempre el contenido final y completo. Si no tienes la información, es preferible que omitas esa parte a que dejes una instrucción.
         """
         try:
             chat_redaccion.send_message(prompt_inicial)
@@ -1485,7 +1553,7 @@ def phase_4_page(model):
                 continue
 
             # Procesamiento de la respuesta (HTML o Markdown)
-            if re.search(r'<\s*html|<!DOCTYPE html>|<body|<div|<table', respuesta_ia, re.IGNORECASE):
+            if '<!DOCTYPE html>' in respuesta_ia and '<body>' in respuesta_ia and '<style>' in respuesta_ia:
                 html_limpio = limpiar_respuesta_json(respuesta_ia) # Reutilizamos esta función para limpiar ```html
                 nombre_img = f"temp_img_prompt_{i+1}.png"
                 image_file = html_a_imagen(html_limpio, output_filename=nombre_img)
