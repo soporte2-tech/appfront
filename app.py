@@ -43,119 +43,102 @@ CLIENT_CONFIG = {
 ROOT_FOLDER_NAME = "ProyectosLicitaciones"
 
 
-# --- FUNCIONES DE INTERACCIÓN CON GOOGLE DRIVE ---
-
-# REEMPLAZA TU FUNCIÓN find_or_create_folder POR ESTA VERSIÓN COMPLETA
+# =============================================================================
+#           BLOQUE DE FUNCIONES DE DRIVE ROBUSTAS (CON REINTENTOS)
+# =============================================================================
 
 def find_or_create_folder(service, folder_name, parent_id=None, retries=3):
-    """Busca una carpeta por nombre. Si no la encuentra, la crea. Incluye reintentos para errores de red."""
+    """Busca una carpeta. Si no la encuentra, la crea. Incluye reintentos para errores de red."""
     query = f"name = '{folder_name}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false"
     if parent_id:
         query += f" and '{parent_id}' in parents"
     
-    # Bucle de reintentos
     for attempt in range(retries):
         try:
-            # Intento 1: Listar para ver si ya existe
             response = service.files().list(q=query, spaces='drive', fields='files(id, name)').execute()
             files = response.get('files', [])
-            
             if files:
-                return files[0]['id'] # Si existe, la devolvemos y salimos
+                return files[0]['id']
             else:
-                # Intento 2: Crear la carpeta si no existe
                 file_metadata = {'name': folder_name, 'mimeType': 'application/vnd.google-apps.folder'}
                 if parent_id:
                     file_metadata['parents'] = [parent_id]
                 folder = service.files().create(body=file_metadata, fields='id').execute()
                 st.toast(f"Carpeta '{folder_name}' creada en tu Drive.")
-                return folder.get('id') # Devolvemos la nueva ID y salimos
-
-        except TimeoutError:
-            if attempt < retries - 1: # Si aún nos quedan intentos
-                st.toast(f"⏳ Timeout al conectar con Drive. Reintentando en 2s... ({attempt + 2}/{retries})")
-                time.sleep(2) # Esperamos 2 segundos antes del siguiente intento
+                return folder.get('id')
+        except (TimeoutError, httplib2.ServerNotFoundError) as e:
+            if attempt < retries - 1:
+                st.toast(f"⏳ Error de red con Drive ({type(e).__name__}). Reintentando... ({attempt + 2}/{retries})")
+                time.sleep(2 ** attempt) # Espera 1, 2, 4 segundos...
             else:
-                st.error("❌ No se pudo conectar con Google Drive después de varios intentos. Refresca la página.")
-                raise # Si era el último intento, lanzamos el error para detener la app
+                st.error("❌ No se pudo conectar con Google Drive. Por favor, refresca la página.")
+                raise
         except Exception as e:
-            # Capturamos otros posibles errores de la API para no bloquear la app
             st.error(f"Ocurrió un error inesperado con Google Drive: {e}")
             raise
 
-def upload_file_to_drive(service, file_object, folder_id):
-    """Sube un objeto de archivo a una carpeta de Drive."""
-    file_metadata = {
-        'name': file_object.name,
-        'parents': [folder_id]
-    }
-    media = MediaIoBaseUpload(io.BytesIO(file_object.getvalue()),
-                              mimetype=file_object.type,
-                              resumable=True)
-    file = service.files().create(body=file_metadata,
-                                  media_body=media,
-                                  fields='id').execute()
-    st.toast(f"📄 Archivo '{file_object.name}' guardado en Drive.")
-    return file.get('id')
+def upload_file_to_drive(service, file_object, folder_id, retries=3):
+    """Sube un objeto de archivo a una carpeta de Drive, con reintentos."""
+    for attempt in range(retries):
+        try:
+            file_metadata = {'name': file_object.name, 'parents': [folder_id]}
+            # Reiniciamos el puntero del archivo en cada reintento
+            file_object.seek(0) 
+            media = MediaIoBaseUpload(file_object, mimetype=file_object.type, resumable=True)
+            file = service.files().create(body=file_metadata, media_body=media, fields='id').execute()
+            st.toast(f"📄 Archivo '{file_object.name}' guardado en Drive.")
+            return file.get('id')
+        except (TimeoutError, httplib2.ServerNotFoundError) as e:
+            if attempt < retries - 1:
+                st.toast(f"⏳ Error de red al subir archivo. Reintentando... ({attempt + 2}/{retries})")
+                time.sleep(2 ** attempt)
+            else:
+                st.error(f"❌ No se pudo subir el archivo '{file_object.name}' tras varios intentos.")
+                raise
+        except Exception as e:
+            st.error(f"Error inesperado al subir archivo: {e}")
+            raise
 
-def delete_file_from_drive(service, file_id):
-    """Elimina un archivo de Drive por su ID."""
-    try:
-        service.files().delete(fileId=file_id).execute()
-        return True
-    except HttpError as error:
-        st.error(f"No se pudo eliminar el archivo: {error}")
-        return False
+def delete_file_from_drive(service, file_id, retries=3):
+    """Elimina un archivo de Drive por su ID, con reintentos."""
+    for attempt in range(retries):
+        try:
+            service.files().delete(fileId=file_id).execute()
+            return True
+        except (TimeoutError, httplib2.ServerNotFoundError) as e:
+            if attempt < retries - 1:
+                st.toast(f"⏳ Error de red al eliminar. Reintentando... ({attempt + 2}/{retries})")
+                time.sleep(2 ** attempt)
+            else:
+                st.error(f"❌ No se pudo eliminar el archivo/carpeta tras varios intentos.")
+                # No lanzamos 'raise' para no romper la app, solo devolvemos False
+                return False
+        except HttpError as error:
+            st.error(f"No se pudo eliminar el archivo: {error}")
+            return False
 
-def find_file_by_name(service, file_name, folder_id):
-    """Busca un archivo por nombre dentro de una carpeta específica."""
-    query = f"name = '{file_name}' and '{folder_id}' in parents and trashed = false"
-    response = service.files().list(q=query, spaces='drive', fields='files(id)').execute()
-    files = response.get('files', [])
-    return files[0]['id'] if files else None
-    
-def send_gmail_notification(credentials, file_name, file_drive_link, user_email):
-    """Envía una notificación por Gmail cuando un archivo está listo."""
-    try:
-        # Construimos el servicio de Gmail
-        gmail_service = build('gmail', 'v1', credentials=credentials)
-        
-        # Obtenemos la información del usuario para personalizar el email
-        oauth2_service = build('oauth2', 'v2', credentials=credentials)
-        user_info = oauth2_service.userinfo().get().execute()
-        user_name = user_info.get('given_name', 'Usuario') # Usamos el nombre de pila o 'Usuario' por defecto
-
-        message = MIMEText(
-            f"""
-            <p>¡Hola, {user_name}!</p>
-            <p>El guion estratégico para tu proyecto <b>"{file_name}"</b> ha sido generado con éxito.</p>
-            <p>Puedes acceder a él, editarlo y compartirlo desde el siguiente enlace a Google Drive:</p>
-            <p style="text-align: center; margin: 20px 0;">
-                <a href="{file_drive_link}" style="font-size: 16px; font-weight: bold; color: #ffffff; background-color: #4285F4; padding: 12px 24px; border-radius: 5px; text-decoration: none;">
-                    Abrir Guion en Google Drive
-                </a>
-            </p>
-            <br>
-            <p>¡Un saludo!</p>
-            <p><em>Tu Asistente de Licitaciones AI</em></p>
-            """,
-            'html'
-        )
-        
-        message['to'] = user_email
-        message['from'] = "me" # "me" es un alias para la cuenta autenticada
-        message['subject'] = f"✅ Tu Guion Estratégico para '{file_name}' está listo"
-        
-        raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
-        body = {'raw': raw_message}
-        
-        gmail_service.users().messages().send(userId='me', body=body).execute()
-        st.toast("📧 Notificación por email enviada con éxito.")
-    
-    except HttpError as error:
-        st.warning(f"No se pudo enviar la notificación por email: {error}.")
-    except Exception as e:
-        st.error(f"Ocurrió un error inesperado al enviar el email: {e}")
+def download_file_from_drive(service, file_id, retries=3):
+    """Descarga el contenido de un archivo de Drive, con reintentos."""
+    for attempt in range(retries):
+        try:
+            request = service.files().get_media(fileId=file_id)
+            fh = io.BytesIO()
+            downloader = MediaIoBaseDownload(fh, request)
+            done = False
+            while done is False:
+                status, done = downloader.next_chunk()
+            fh.seek(0)
+            return fh
+        except (TimeoutError, httplib2.ServerNotFoundError) as e:
+            if attempt < retries - 1:
+                st.toast(f"⏳ Error de red al descargar. Reintentando... ({attempt + 2}/{retries})")
+                time.sleep(2 ** attempt)
+            else:
+                st.error(f"❌ No se pudo descargar el archivo tras varios intentos.")
+                raise
+        except Exception as e:
+            st.error(f"Error inesperado al descargar: {e}")
+            raise
     
 # --- CONFIGURACIÓN DE LA PÁGINA ---
 st.set_page_config(page_title="Asistente de Licitaciones AI", layout="wide", initial_sidebar_state="collapsed")
