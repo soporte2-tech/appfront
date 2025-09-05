@@ -44,7 +44,7 @@ ROOT_FOLDER_NAME = "ProyectosLicitaciones"
 
 
 # =============================================================================
-#           BLOQUE DE FUNCIONES DE DRIVE DEFINITIVO (CON LAS 5 FUNCIONES)
+#           BLOQUE DE FUNCIONES DE DRIVE DEFINITIVO (CON LAS 6 FUNCIONES)
 # =============================================================================
 
 def find_or_create_folder(service, folder_name, parent_id=None, retries=3):
@@ -156,24 +156,25 @@ def download_file_from_drive(service, file_id, retries=3):
         except Exception as e:
             st.error(f"Error inesperado al descargar: {e}")
             raise
-# --- CONFIGURACIÓN DE LA PÁGINA ---
-st.set_page_config(page_title="Asistente de Licitaciones AI", layout="wide", initial_sidebar_state="collapsed")
 
-# --- CONFIGURACIÓN DE LA API KEY Y MODELO DE IA ---
-# Streamlit buscará el secret 'GEMINI_API_KEY' que has configurado.
-try:
-    # --- CORRECCIÓN AQUÍ ---
-    # Usamos el NOMBRE del secret (la clave), no el valor.
-    api_key = st.secrets["GEMINI_API_KEY"]
-    genai.configure(api_key=api_key)
-    # Usamos un modelo potente y rápido para esta tarea
-    model = genai.GenerativeModel('gemini-2.5-flash')
-except Exception as e:
-    # Mostramos un error amigable si la API Key no está configurada
-    st.error(f"Error al configurar la API de Gemini. Asegúrate de que el secret 'GEMINI_API_KEY' esté bien configurado en 'Manage app'. Error: {e}")
-    # Detenemos la ejecución de la app si no hay API Key
-    st.stop()
-
+# --- ESTA ES LA FUNCIÓN QUE FALTABA ---
+def list_project_folders(service, root_folder_id, retries=3):
+    """Lista las subcarpetas (proyectos) dentro de la carpeta raíz, con reintentos."""
+    query = f"'{root_folder_id}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false"
+    for attempt in range(retries):
+        try:
+            response = service.files().list(q=query, spaces='drive', fields='files(id, name)').execute()
+            return {file['name']: file['id'] for file in response.get('files', [])}
+        except (TimeoutError, httplib2.ServerNotFoundError) as e:
+            if attempt < retries - 1:
+                st.toast(f"⏳ Error de red listando proyectos. Reintentando... ({attempt + 2}/{retries})")
+                time.sleep(2 ** attempt)
+            else:
+                st.error("❌ No se pudieron listar los proyectos de Drive tras varios intentos.")
+                return {} # Devolvemos un diccionario vacío en caso de fallo final
+        except Exception as e:
+            st.error(f"Error inesperado al listar proyectos: {e}")
+            return {}
 # --- PROMPTS DE LA IA ---
 # He copiado tus prompts directamente desde tu código de Colab.
 PROMPT_CONSULTOR_REVISION = """
