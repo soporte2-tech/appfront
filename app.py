@@ -773,7 +773,7 @@ def project_selection_page():
 #           VERSIÓN DEFINITIVA DE phase_1_page()
 # =============================================================================
 
-def phase_1_page():
+def phase_1_page(model):
     """Página de Fase 1 que lee/escribe en subcarpetas y gestiona el estado correctamente."""
     if not st.session_state.get('selected_project'):
         st.warning("No se ha seleccionado ningún proyecto. Volviendo a la selección.")
@@ -878,7 +878,7 @@ def phase_1_page():
 #           REEMPLAZA phase_1_results_page POR ESTA VERSIÓN COMPLETA
 # =============================================================================
 
-def phase_1_results_page():
+def phase_1_results_page(model):
     """Página para revisar, regenerar y ACEPTAR el índice para pasar a Fase 2."""
     st.markdown("<h3>FASE 1: Revisión de Resultados</h3>", unsafe_allow_html=True)
     st.markdown("Revisa y ajusta el índice hasta que sea perfecto. Cuando esté listo, pasa a la siguiente fase para generar el contenido de cada apartado.")
@@ -966,7 +966,7 @@ def phase_1_results_page():
 
 #           VERSIÓN DEFINITIVA de phase_2_page (CON TODA LA LÓGICA)
 # =============================================================================
-def phase_2_page():
+def phase_2_page(model):
     """Centro de mando para la generación y re-generación de guiones con documentación de apoyo."""
     st.markdown("<h3>FASE 2: Centro de Mando de Guiones</h3>", unsafe_allow_html=True)
     st.markdown("Genera los borradores iniciales adjuntando documentación de apoyo, revísalos en Drive y luego re-genéralos con el feedback incorporado.")
@@ -1353,7 +1353,8 @@ def phase_3_page(model_obj):
     
     st.button("← Volver al Centro de Mando (F2)", on_click=go_to_phase2, use_container_width=True)
                     
-#                        LÓGICA PRINCIPAL (ROUTER) - VERSIÓN CORRECTA
+# =============================================================================
+#                        LÓGICA PRINCIPAL (ROUTER) - VERSIÓN CORREGIDA
 # =============================================================================
 
 # Primero, SIEMPRE comprobamos si tenemos credenciales de usuario.
@@ -1366,6 +1367,18 @@ if not credentials:
 
 # Si SÍ hay credenciales, el usuario ya ha iniciado sesión.
 else:
+    # --- !! INICIO DE LA CORRECCIÓN !! ---
+    # Configurar la API de Gemini y crear el modelo una sola vez aquí.
+    # Así estará disponible para todas las páginas.
+    try:
+        genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+        # Asegúrate de que tienes una secret llamada "GEMINI_API_KEY" en Streamlit Cloud
+        model = genai.GenerativeModel('gemini-1.5-pro-latest') 
+    except Exception as e:
+        st.error(f"Error al configurar la API de Gemini. Verifica tu 'GEMINI_API_KEY' en los secrets. Detalle: {e}")
+        st.stop()
+    # --- FIN DE LA CORRECCIÓN ---
+
     # Ahora que sabemos que está dentro, miramos en qué página quiere estar.
     # Si acaba de iniciar sesión, su 'page' será 'landing', así que lo llevamos
     # a la selección de proyectos.
@@ -1373,11 +1386,17 @@ else:
         project_selection_page()
     
     elif st.session_state.page == 'phase_1':
-        phase_1_page()
+        # Pasamos el objeto 'model' a la función de la página
+        phase_1_page(model)
         
     elif st.session_state.page == 'phase_1_results':
-        phase_1_results_page()
+        # Pasamos el objeto 'model' a la función de la página
+        phase_1_results_page(model)
+
     elif st.session_state.page == 'phase_2':
-        phase_2_page()
-        
-    # La página 'phases' ya no existe en este nuevo flujo, por eso no se incluye.
+        # Pasamos el objeto 'model' a la función de la página
+        phase_2_page(model)
+
+    elif st.session_state.page == 'phase_3':
+        # Pasamos el objeto 'model' a la función de la página
+        phase_3_page(model)
