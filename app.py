@@ -432,8 +432,8 @@ PROMPT_DESARROLLO = """
     Debes seguir estos pasos para hacer estos prompts:
 
 
-    1. Investiga cuántas páginas tiene que durar este apartado viendo lo que pone en los archivos que empiezan por la palabra "Pliego" (que dicen esos Pliegos sobre la duración del contenido) y "Memoria de ejemplo" (cuánto le duró la redacción a la persona, en caso de que exista claro). Entiende esa longitud y decide cuántas palabras tiene que haber por prompt para llegar a esa longitud.
-    2. Investiga en los archivos del "Pliego" lo que se pide en ese apartado y dividelo en varios prompts para poder llegar al objetivo. Detalla mucho contexto en cada uno para que no haya sorpresas.
+    1. Tu objetivo es crear UN SOLO prompt para el subapartado completo que se te ha asignado. No lo dividas en múltiples prompts. Define un rango de palabras coherente para que el redactor final sepa la longitud esperada.
+    2. Dentro de ese único prompt, detalla todo el contexto y los puntos clave que el redactor debe cubrir, basándote en la información de los Pliegos y los guiones. Sé exhaustivo en las instrucciones.
     3. Una vez ya sabes cuántas palabras tendrán los prompts, complementa el contenido de cada prompt con el CONTEXTO ADICIONAL que te proporciono. Este contexto incluye el guion borrador ya creado y la documentación de apoyo. Úsalo como base principal para dar forma a la propuesta de contenido.Intenta siempre usar un contenidio de la empresa real, pero si en la documentación o el mensaje inicial que se te dió no hay nada para llegar a ese objetivo.
     4. Añade en los prompts siempre la libertad para que referencien algo mencionado antes (menos de los Pliegos en exceso, que queda cantoso), mostrando así una coherencia y un humanismo. Menciona también que debe parecer humana la redacción. El objetivo es que sea fácil de leer y que resulte amena la lectura.
     5. Pide que se tenga en cuenta lo que se ha dicho antes tanto en el apartado como en general para evitar incongruencias. Añade referencias a lo que se ha dicho en otros párrafos.
@@ -1338,7 +1338,7 @@ def phase_3_page(model):
             except Exception as e:
                 st.error(f"Error generando prompts para '{subapartado_titulo}': {e}")
     
-    # --- FUNCIÓN PARA UNIFICAR PLANES ---
+    # --- FUNCIÓN PARA UNIFICAR PLANES (VERSIÓN CORREGIDA CON ORDENACIÓN) ---
     def handle_conjunto_generation():
         with st.spinner("Buscando y unificando todos los planes de prompts individuales..."):
             try:
@@ -1358,6 +1358,11 @@ def phase_3_page(model):
                     st.warning("No se encontraron planes individuales para unificar. Genera al menos uno.")
                     return
 
+                # --- LÍNEA DE CÓDIGO CLAVE AÑADIDA ---
+                # Ordenamos la lista de prompts basándonos en su ID para asegurar el orden correcto del documento final.
+                all_prompts.sort(key=lambda x: x.get('prompt_id', ''))
+                # -----------------------------------------
+
                 final_json_object = {"plan_de_prompts": all_prompts}
                 json_bytes_conjunto = json.dumps(final_json_object, indent=2, ensure_ascii=False).encode('utf-8')
                 mock_file_obj = io.BytesIO(json_bytes_conjunto)
@@ -1369,7 +1374,7 @@ def phase_3_page(model):
                     delete_file_from_drive(service, old_conjunto_id)
                 
                 upload_file_to_drive(service, mock_file_obj, docs_app_folder_id)
-                st.success(f"¡Plan conjunto generado con {len(all_prompts)} prompts y guardado en Drive!")
+                st.success(f"¡Plan conjunto generado y ORDENADO con {len(all_prompts)} prompts y guardado en Drive!")
 
             except Exception as e:
                 st.error(f"Error al generar el plan conjunto: {e}")
@@ -1416,7 +1421,7 @@ def phase_3_page(model):
                 else:
                     st.button("Generar Plan de Prompts", key=f"gen_{i}", on_click=handle_individual_generation, args=(matiz, model), use_container_width=True, type="primary", disabled=not guion_generado)
 
-    # --- BOTONES DE NAVEGACIÓN (VERSIÓN CORREGIDA) ---
+    # --- BOTONES DE NAVEGACIÓN ---
     st.markdown("---")
     col_nav3_1, col_nav3_2 = st.columns(2)
     with col_nav3_1:
