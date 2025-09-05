@@ -1210,7 +1210,8 @@ def phase_3_page():
     matices = st.session_state.generated_structure.get('matices_desarrollo', [])
     
 # --- FUNCIÓN INTERNA DE GENERACIÓN INDIVIDUAL (CORREGIDA) ---
-    def handle_individual_generation(matiz_info, model_obj): # <--- 1. AÑADIMOS model_obj COMO PARÁMETRO
+# --- FUNCIÓN INTERNA DE GENERACIÓN INDIVIDUAL (CORREGIDA) ---
+    def handle_individual_generation(matiz_info, model_obj):
         apartado_titulo = matiz_info.get("apartado", "N/A")
         subapartado_titulo = matiz_info.get("subapartado", "N/A")
         
@@ -1248,7 +1249,6 @@ def phase_3_page():
                 contenido_ia = [prompt_final] + pliegos_content_for_ia
                 generation_config = genai.GenerationConfig(response_mime_type="application/json")
                 
-                # <--- 3. USAMOS model_obj, LA VARIABLE QUE HEMOS PASADO
                 response = model_obj.generate_content(contenido_ia, generation_config=generation_config)
                 
                 json_limpio_str = limpiar_respuesta_json(response.text)
@@ -1268,7 +1268,8 @@ def phase_3_page():
                     st.toast(f"Plan para '{subapartado_titulo}' guardado en su carpeta de Drive.")
 
             except Exception as e:
-                st.error(f"Error generando prompts para '{subapartado_titulo}': {e}"))
+                # --- ESTA ES LA LÍNEA CORREGIDA ---
+                st.error(f"Error generando prompts para '{subapartado_titulo}': {e}")
     
     # --- FUNCIÓN PARA UNIFICAR PLANES ---
     def handle_conjunto_generation():
