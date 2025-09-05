@@ -451,7 +451,7 @@ PROMPT_DESARROLLO = """
             <title>Visual Element</title>
             <style>
                 @import url('https://fonts.googleapis.com/css2?family=Urbanist:wght@400;600;700&display=swap');
-                body {
+                body {{
                     font-family: 'Urbanist', sans-serif;
                     background-color: #f0f2f5;
                     display: flex;
@@ -460,8 +460,8 @@ PROMPT_DESARROLLO = """
                     padding: 20px;
                     width: 800px;
                     box-sizing: border-box;
-                }
-                .card {
+                }}
+                .card {{
                     background-color: white;
                     border-radius: 10px;
                     box-shadow: 0 4px 8px rgba(0,0,0,0.1);
@@ -469,32 +469,32 @@ PROMPT_DESARROLLO = """
                     width: 100%;
                     max-width: 750px;
                     border-top: 5px solid #0046C6;
-                }
-                h2 {
+                }}
+                h2 {{
                     color: #0046C6;
                     text-align: center;
                     margin-top: 0;
                     font-size: 24px;
                     font-weight: 700;
-                }
-                ul {
+                }}
+                ul {{
                     list-style-type: none;
                     padding: 0;
-                }
-                li {
+                }}
+                li {{
                     display: flex;
                     align-items: center;
                     margin-bottom: 15px;
                     font-size: 16px;
                     color: #333;
-                }
-                li::before {
+                }}
+                li::before {{
                     content: '✔';
                     color: #32CFAA;
                     font-size: 20px;
                     font-weight: bold;
                     margin-right: 15px;
-                }
+                }}
             </style>
         </head>
         <body>
@@ -506,7 +506,7 @@ PROMPT_DESARROLLO = """
             </div>
         </body>
         </html>
-        ```    
+        ```
     9. Debes cumplir todos los criterios pero sin mencionar que tu objetivo es cumplirlos. Es decir, debes hacer lo que se valora pero sin decir que esa sección existe para cumplir con un criterio. La redacción y el parafraseo debe ser muy elegante para demostrar un dominio y cumplimiento de los objetivos sin sonar pesado.
     10. No uses recursos como el ;, los : y ese tipo de expresiones que parecen hechas con IA. Tampoco uses expresiones precedidas por -. Debes prafasear mucho. Tu texto debe parecer natural sin perder la profesionalidad.
     11. Debes establecer el mismo idioma para todas las redacciones. Este idioma debe ser el castellano.
@@ -520,6 +520,7 @@ PROMPT_DESARROLLO = """
     19. No menciones el nombre de la empresa que se presenta a la licitación todo el rato. Ya se sabe que es la empresa, no hace falta ponerlo tan repetidamente.
     20. NO PONGAS NUNCA los títulos las primeras letras de las palabras en mayusculas. Es decir si la frase es "El Enfoque Nativo en la Nube y la IA" ponlo así "El enfoque nativo en la nube y la IA". Cuida mucho eso en tu redacción es fundamental.
     21. ESTÁ PROHIBIDO GENERAR PROMPTS QUE INCLUYAN INSTRUCCIONES O MARCADORES DE POSICIÓN como '[Completa aquí]' o '[Ajusta la tabla]'. El prompt debe contener toda la información para que el redactor final genere el texto completo, no para que le dé instrucciones.
+
 
     Estructura obligatoria para cada prompt: Cada prompt debe comenzar indicando con claridad qué apartado se va a redactar y cuál es el objetivo específico de ese apartado dentro de la memoria. A continuación, debe definir el rango o número aproximado de palabras que debe ocupar el texto. Seguidamente, se incluirá una explicación de contexto general de la dictación, detallando todos los puntos y requisitos que se deben cubrir en ese apartado. Después, se aportará un contexto concreto de la empresa, para cumplir esos requisitos presentando la propuesta de la empresa totalmente personalizada a sus fortalezas . Finalmente, el prompt debe cerrar con una lista de matices o consideraciones importantes para la redacción (tono, estilo, prohibiciones, obligatoriedades, etc.) las cuáles hemos pautado anteriormente cuando mencionamos las reglas, que sirvan como guía de calidad y eviten errores habituales.
 
@@ -545,12 +546,12 @@ PROMPT_DESARROLLO = """
     Tu respuesta DEBE ser SÓLO un único objeto JSON válido (sin ```json al principio ni ``` al final y sin ningún texto que lo acompañe), que contenga una única clave `"plan_de_prompts"` cuyo valor sea una lista de objetos. Cada objeto de la lista representa un prompt y debe seguir esta estructura exacta:
 
 
-    {{
+    {{{{
       "apartado_referencia": "El título del apartado principal que te he proporcionado (ej: 2. Solución Técnica Propuesta)",
       "subapartado_referencia": "El título del subapartado que te he proporcionado (ej: 2.1. Metodología de Trabajo)",
       "prompt_id": "Un identificador único para el prompt (ej: PROMPT_2_1_A)(Si es un HTML se debe agregar "HTML_VISUAL" al id (ej: PROMPT_2_1_1_HTML_VISUAL))",
       "prompt_para_asistente": "La pregunta o instrucción específica y detallada para el asistente (ej: )."
-    }}
+    }}}}
 
 
     Para redactar tu respuesta, DEBES utilizar la información de los archivos que tienes disponibles:
@@ -564,6 +565,15 @@ PROMPT_DESARROLLO = """
 
     Genera un texto profesional, bien estructurado y que responda directamente a las indicaciones. No añadas introducciones o conclusiones que no se pidan.
 """
+
+---
+### Pasos a Seguir:
+
+1.  **Reemplaza** el `PROMPT_DESARROLLO` en tu `app.py` con el código de arriba.
+2.  **Guarda y reinicia** ("Reboot") tu aplicación de Streamlit.
+3.  **Vuelve a la Fase 3** y haz clic en "Generar Plan de Prompts" para el apartado que estaba fallando.
+
+Ahora sí, con este prompt completo y totalmente "escapado", el error `KeyError` desaparecerá y podrás generar los planes de prompts sin problemas.
 # =============================================================================
 #              NUEVAS FUNCIONES: AUTENTICACIÓN Y GOOGLE DRIVE
 # =============================================================================
