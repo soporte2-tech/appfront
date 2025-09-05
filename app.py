@@ -421,6 +421,81 @@ Tu única tarea es generar una **NUEVA VERSIÓN MEJORADA** del objeto JSON que i
 Genera únicamente el objeto JSON corregido. No incluyas ningún texto fuera de él.
 """
 
+PROMPT_DESARROLLO = f"""
+    Actúa como un consultor experto redactando una memoria técnica para una licitación pública. Debes hacer una memoria técnica seria, pero amena de leer con algunos (sin excederse) elementos gráficos, tablas y listas que hagan la lectura más fácil y profesional.
+    Tu tarea es crear los prompts que darán forma al texto de este subapartado. Es por ello que debes que tener en cuenta que estas indicaciones
+    deben tener todo tipo de detalles para que otra IA sea capaz de con ese contexto recibirlo y generar el contenido final de la mejor manera posible.
+    Debes ser un buen guía para que la IA no cometa errores de escritura y realice un buen trabajo.
+    Debes seguir estos pasos para hacer estos prompts:
+
+
+    1. Investiga cuántas páginas tiene que durar este apartado viendo lo que pone en los archivos que empiezan por la palabra "Pliego" (que dicen esos Pliegos sobre la duración del contenido) y "Memoria de ejemplo" (cuánto le duró la redacción a la persona, en caso de que exista claro). Entiende esa longitud y decide cuántas palabras tiene que haber por prompt para llegar a esa longitud.
+    2. Investiga en los archivos del "Pliego" lo que se pide en ese apartado y dividelo en varios prompts para poder llegar al objetivo. Detalla mucho contexto en cada uno para que no haya sorpresas.
+    3. Una vez ya sabes cuántas palabras tendrán los prompts, complementa el contenido de cada prompt con el CONTEXTO ADICIONAL que te proporciono. Este contexto incluye el guion borrador ya creado y la documentación de apoyo. Úsalo como base principal para dar forma a la propuesta de contenido.Intenta siempre usar un contenidio de la empresa real, pero si en la documentación o el mensaje inicial que se te dió no hay nada para llegar a ese objetivo.
+    4. Añade en los prompts siempre la libertad para que referencien algo mencionado antes (menos de los Pliegos en exceso, que queda cantoso), mostrando así una coherencia y un humanismo. Menciona también que debe parecer humana la redacción. El objetivo es que sea fácil de leer y que resulte amena la lectura.
+    5. Pide que se tenga en cuenta lo que se ha dicho antes tanto en el apartado como en general para evitar incongruencias. Añade referencias a lo que se ha dicho en otros párrafos.
+    5.1 Está prohibido poner explícitamente algo de cómo ha sido la estructura o que hay referencias de prompts como "(referencia a PROMPT_1_1_B)". Si tienes que poner alguna referencia de algún sitio pon el apartado. Si no sabes que apartado es, opta por no poner nada de la referencia. No pueden detectar que este trabajo ha sido realizado con IA.
+    6. No dudes en añadir tablas que resuman el contenido. Debes usar bullet points y listas para dar las ideas de una manera más clara para que el lector se sienta cómodo al leerlo. Lo ideal es que haya un número coherente de tablas, listados y elementos htmls sin resultar repetitivo. Siempre siguiendo un balance de 75% texto normal y 25% tablas, elementos gráficos html y listas fáciles de ver.
+    7. Evita las conclusiones si van a ser redundantes. Suelen ser un sintoma de que se usa IA, así que saltatelas o no las empieces con expresiones como 'En definitiva' o 'En conclusión'. El objetivo es ser ameno y directo, y este tipo de secciones impiden llegar a ese objetivo.
+    8. Finalmente, si consideras que la sección se podría resumir con un buen elemento visual (como podrían ser secciones en las cuáles hables de varias cosas y sea necesario un resumen visual) crea un prompt específico en HTML que resuma todo lo que se ha visto. Ten en cuenta que ese elemento será tratado en python y que por ello debe salir muy bien preparado, ya que no se podrá editar bajo ningún concepto. Asume esa presión y haz que salga perfecto en esa versión inicial. Piensa que de ese html se sacará una captura png y se pegará en un Word, haz que el html entre en un espacio reducido horizontal. Usa la letra Urbansit y estos colores #0046C6 #EDE646 #32CFAA #C2D1F2 #EB0045 y que no posean emoticonos para facilitar su creación . Haz diseños minimalistas y muy visuales. Poco texto y explicaciones muy visuales. No pongas contenido a pie de página de la empresa diciendo cosas redundantes. El objetivo del HTML es hacer más bonita la presentación, aportar información y asentar conceptos.
+    9. Debes cumplir todos los criterios pero sin mencionar que tu objetivo es cumplirlos. Es decir, debes hacer lo que se valora pero sin decir que esa sección existe para cumplir con un criterio. La redacción y el parafraseo debe ser muy elegante para demostrar un dominio y cumplimiento de los objetivos sin sonar pesado.
+    10. No uses recursos como el ;, los : y ese tipo de expresiones que parecen hechas con IA. Tampoco uses expresiones precedidas por -. Debes prafasear mucho. Tu texto debe parecer natural sin perder la profesionalidad.
+    11. Debes establecer el mismo idioma para todas las redacciones. Este idioma debe ser el castellano.
+    12. Debes poner mucho detalle en los cronogramas. Detalla bien las fases y bájalo a semanas. En las actividades detalla bien cuánto tiempo llevan y qué se va a hacer en cada una de ellas. Especifica detalladamente las actividades o los objetos de contratación propuestos para que se vean como un plan de acción más que como algo teórico, que el que evalúa el contenido pueda ver claramente qué es exactamente lo que se va a hacer o ofrecer.
+    13. Si se habla de KPIs de evaluación, propón unos realistas y que estén relacionados con la empresa. Explica porqué esos indicadores, en qué consistirán y cómo se utilizarán para evaluar el desempeño. Hazlo desde un marco que no comprometa a la empresa (es decir que sean realistas) y que de una imagen de profesionalidad al evaluador.
+    14. No puedes mencionar las cualidades y atributos de la empresa cada dos por tres. Debes evitar el exceso de retórica, repetición continua de “metodología validada en mas de 1000 proyectos”, “índice de satisfacción 9.6”, “aliado estratégico...”. Eso suena a texto estandar y no convence. Debes ser directo, pulcro y evitar el meter contenido que no aporte valor. Evita frases grandilocuentes y repetitivas.
+    15. Sé concreto, da siempre información clara sobre el quién, cómo, cuándo y cuánto. El corrector valora mucho que se sea concreto y claro en la propuesta. Específica clarmente la propuesta con pulcridad para que el redactor no entre en ambiguedades.
+    16. Evita la redacción uniforme con frases muy largas, estructuradas y sobre todo con la repetición de conceptos. Evita el exceso de adjetivos y palabras muy cantosas típicas de textos generados o revisados con IA.
+    17. No repitas la misma idea con palabras diferentes en apartados distintos. Intenta ser muy concreto en cada apartado y diferenciarte de los anteriores. No suenes redundante y trata de ser concreto y claro en cada apartado nuevo, manteniendo la coherencia con lo anterior pero evitando repetirte.
+    18. No comiences los párrafos de los subapartados mencionando el nombre de la empresa y su compromiso con no se que "DPI Estrategia, en su compromiso con la transparencia y la rendición de cuentas, elaborará y entregará una memoria final completa al término de los doce meses del programa.". Usa mejor una introducción más limpia que no mencione el nombre de la empresa y que diga "A modo de cerrar el servicio, se cerrará con una memoria final. Esta memoria final incluirá...".
+    19. No menciones el nombre de la empresa que se presenta a la licitación todo el rato. Ya se sabe que es la empresa, no hace falta ponerlo tan repetidamente.
+    20. NO PONGAS NUNCA los títulos las primeras letras de las palabras en mayusculas. Es decir si la frase es "El Enfoque Nativo en la Nube y la IA" ponlo así "El enfoque nativo en la nube y la IA". Cuida mucho eso en tu redacción es fundamental.
+
+
+    Estructura obligatoria para cada prompt: Cada prompt debe comenzar indicando con claridad qué apartado se va a redactar y cuál es el objetivo específico de ese apartado dentro de la memoria. A continuación, debe definir el rango o número aproximado de palabras que debe ocupar el texto. Seguidamente, se incluirá una explicación de contexto general de la dictación, detallando todos los puntos y requisitos que se deben cubrir en ese apartado. Después, se aportará un contexto concreto de la empresa, para cumplir esos requisitos presentando la propuesta de la empresa totalmente personalizada a sus fortalezas . Finalmente, el prompt debe cerrar con una lista de matices o consideraciones importantes para la redacción (tono, estilo, prohibiciones, obligatoriedades, etc.) las cuáles hemos pautado anteriormente cuando mencionamos las reglas, que sirvan como guía de calidad y eviten errores habituales.
+
+
+    Si un apartado es "Índice", apartados que posean un 0 delante o algo análogo, evita ese apartado y no crees un prompt para ese caso. No hay que redactar nada en ese caso y por lo tanto no nos interesa.
+    Debes seguir las intrucciones de contexto general que se te han dado al comienzo de esta conversación para que el docuemnto esté alineado a ello.
+    Redacta el contenido de los prompts dentro del json en GitHub Flavored Markdown (gfm). Se pulcro con ello y pide que en la redacción también se use ese estilo.
+    Es muy importante la calidad del contenido y lo visual que se muestre. Intenta meter muchas tablas, listas y elementos HTML que decoren y resuman el contenido. Debe ser visual y atractivo sin perder el toque profesional. Intenta no meter mucha paja ni contenido que no aporte nada de valor. Menos contenido, bien explicado y sin explicar los conceptos dos veces, céntrate en ir al grano y no dar vueltas.
+
+
+    Este es el subapartado para el que debes redactar los prompts:
+
+
+    - **Apartado Principal:** "{apartado_titulo}"
+    - **Subapartado a Redactar:** "{subapartado_titulo}"
+
+
+    Las instrucciones exactas de la plantilla para este subapartado son:
+    - **Indicaciones (pueden venir vacías, en ese caso búscalas):** "{indicaciones}" (Complementalas y aumenta el contexto en tus instrucciones)
+
+
+    **REGLAS DE SALIDA:**
+    Tu respuesta DEBE ser SÓLO un único objeto JSON válido (sin ```json al principio ni ``` al final y sin ningún texto que lo acompañe), que contenga una única clave `"plan_de_prompts"` cuyo valor sea una lista de objetos. Cada objeto de la lista representa un prompt y debe seguir esta estructura exacta:
+
+
+    {{
+      "apartado_referencia": "El título del apartado principal que te he proporcionado (ej: 2. Solución Técnica Propuesta)",
+      "subapartado_referencia": "El título del subapartado que te he proporcionado (ej: 2.1. Metodología de Trabajo)",
+      "prompt_id": "Un identificador único para el prompt (ej: PROMPT_2_1_A)(Si es un HTML se debe agregar "HTML_VISUAL" al id (ej: PROMPT_2_1_1_HTML_VISUAL))",
+      "prompt_para_asistente": "La pregunta o instrucción específica y detallada para el asistente (ej: )."
+    }}
+
+
+    Para redactar tu respuesta, DEBES utilizar la información de los archivos que tienes disponibles:
+    1.  Consulta los **Pliegos** para entender y cumplir todos los requisitos técnicos y de puntuación mencionados en las indicaciones.
+    2.  Consulta las **Memorias de ejemplo** para adoptar un tono, estilo y nivel de detalle similar. (Si aplica)
+    3.  Consulta la **Doc. Empresa** para incorporar información específica de nuestra compañía (como nombres de tecnologías, proyectos pasados o certificaciones) si es relevante.
+
+
+    **RESPUESTA EN ESPAÑOL SIEMPRE**
+
+
+    Genera un texto profesional, bien estructurado y que responda directamente a las indicaciones. No añadas introducciones o conclusiones que no se pidan.
+    """
+
 # =============================================================================
 #              NUEVAS FUNCIONES: AUTENTICACIÓN Y GOOGLE DRIVE
 # =============================================================================
@@ -1083,6 +1158,145 @@ def phase_2_page():
                     if btn_container.button("Generar Borrador", key=f"gen_{i}", use_container_width=True):
                         indicaciones = next((m for m in matices if m['subapartado'] == subapartado_titulo), None)
                         ejecutar_generacion(subapartado_titulo, indicaciones)
+
+# =============================================================================
+#           NUEVA PÁGINA: FASE 3 - CENTRO DE MANDO DE PROMPTS
+# =============================================================================
+
+def phase_3_page():
+    """Página interactiva para generar el plan de prompts subapartado por subapartado."""
+    st.markdown("<h3>FASE 3: Centro de Mando de Prompts</h3>", unsafe_allow_html=True)
+    st.markdown("Selecciona para qué subapartados deseas generar un plan de prompts detallado. La IA utilizará los guiones y el contexto que preparaste en la Fase 2.")
+    st.markdown("---")
+
+    # --- SETUP Y COMPROBACIONES ---
+    if 'selected_project' not in st.session_state or 'generated_structure' not in st.session_state:
+        st.warning("No se ha cargado un proyecto o un índice. Vuelve a la Fase 1.")
+        if st.button("← Ir a Selección de Proyecto"): back_to_project_selection_and_cleanup(); st.rerun()
+        return
+
+    service = st.session_state.drive_service
+    project_folder_id = st.session_state.selected_project['id']
+    matices = st.session_state.generated_structure.get('matices_desarrollo', [])
+
+    # --- CARGA DEL PLAN DE PROMPTS EXISTENTE ---
+    docs_app_folder_id = find_or_create_folder(service, "Documentos aplicación", parent_id=project_folder_id)
+    prompt_plan_file_id = find_file_by_name(service, "plan_de_prompts.json", docs_app_folder_id)
+    
+    if 'prompt_plan' not in st.session_state or not prompt_plan_file_id:
+        if prompt_plan_file_id:
+            with st.spinner("Cargando plan de prompts existente desde Drive..."):
+                json_content_bytes = download_file_from_drive(service, prompt_plan_file_id).getvalue()
+                st.session_state.prompt_plan = json.loads(json_content_bytes.decode('utf-8'))
+        else:
+            st.session_state.prompt_plan = {"plan_de_prompts": []}
+
+    # --- LÓGICA DE GENERACIÓN INDIVIDUAL ---
+    def handle_individual_generation(matiz_info):
+        apartado_titulo = matiz_info.get("apartado", "N/A")
+        subapartado_titulo = matiz_info.get("subapartado", "N/A")
+        
+        with st.spinner(f"Generando prompts para: '{subapartado_titulo}'..."):
+            try:
+                # 1. RECOLECTAR CONTEXTO DE FASE 2
+                nombre_limpio = re.sub(r'[\\/*?:"<>|]', "", subapartado_titulo)
+                guiones_main_folder_id = find_or_create_folder(service, "Guiones de Subapartados", parent_id=project_folder_id)
+                subapartado_folder_id = find_file_by_name(service, nombre_limpio, guiones_main_folder_id) # OJO: find_file puede buscar carpetas si no se especifica mimeType
+                
+                contexto_adicional_str = ""
+                if subapartado_folder_id:
+                    files_in_subfolder = get_files_in_project(service, subapartado_folder_id)
+                    for file_info in files_in_subfolder:
+                        file_bytes = download_file_from_drive(service, file_info['id'])
+                        if file_info['name'].endswith('.docx'):
+                            doc = docx.Document(file_bytes)
+                            texto_doc = "\n".join([p.text for p in doc.paragraphs])
+                            contexto_adicional_str += f"\n--- CONTENIDO DEL GUION ({file_info['name']}) ---\n{texto_doc}\n"
+                        elif file_info['name'].endswith('.pdf'):
+                            reader = PdfReader(file_bytes)
+                            texto_pdf = "".join(page.extract_text() for page in reader.pages)
+                            contexto_adicional_str += f"\n--- CONTENIDO DEL PDF DE APOYO ({file_info['name']}) ---\n{texto_pdf}\n"
+
+                # 2. PREPARAR CONTENIDO PARA LA IA
+                pliegos_folder_id = find_or_create_folder(service, "Pliegos", parent_id=project_folder_id)
+                pliegos_files_info = get_files_in_project(service, pliegos_folder_id)
+                pliegos_content_for_ia = [{"mime_type": f['mimeType'], "data": download_file_from_drive(service, f['id']).getvalue()} for f in pliegos_files_info]
+
+                prompt_final = PROMPT_DESARROLLO.format(
+                    apartado_titulo=apartado_titulo,
+                    subapartado_titulo=subapartado_titulo,
+                    indicaciones=matiz_info.get("indicaciones", ""),
+                    contexto_adicional=contexto_adicional_str
+                )
+
+                contenido_ia = [prompt_final] + pliegos_content_for_ia
+                generation_config = genai.GenerationConfig(response_mime_type="application/json")
+                response = model.generate_content(contenido_ia, generation_config=generation_config)
+                
+                # 3. PROCESAR RESPUESTA Y ACTUALIZAR PLAN MAESTRO
+                json_limpio_str = limpiar_respuesta_json(response.text)
+                if json_limpio_str:
+                    plan_parcial = json.loads(json_limpio_str)
+                    nuevos_prompts = plan_parcial.get("plan_de_prompts", [])
+                    
+                    # Filtramos los prompts viejos para este subapartado y añadimos los nuevos
+                    prompts_actuales = st.session_state.prompt_plan['plan_de_prompts']
+                    prompts_filtrados = [p for p in prompts_actuales if p.get('subapartado_referencia') != subapartado_titulo]
+                    st.session_state.prompt_plan['plan_de_prompts'] = prompts_filtrados + nuevos_prompts
+
+                    # 4. GUARDAR PLAN MAESTRO ACTUALIZADO EN DRIVE
+                    json_bytes = json.dumps(st.session_state.prompt_plan, indent=2, ensure_ascii=False).encode('utf-8')
+                    mock_file_obj = io.BytesIO(json_bytes)
+                    mock_file_obj.name = "plan_de_prompts.json"
+                    mock_file_obj.type = "application/json"
+                    
+                    if prompt_plan_file_id: delete_file_from_drive(service, prompt_plan_file_id)
+                    upload_file_to_drive(service, mock_file_obj, docs_app_folder_id)
+                    
+                    st.toast(f"Plan de prompts para '{subapartado_titulo}' generado y guardado.")
+                    st.rerun()
+
+            except Exception as e:
+                st.error(f"Error generando prompts para '{subapartado_titulo}': {e}")
+
+
+    # --- INTERFAZ DE USUARIO ---
+    for i, matiz in enumerate(matices):
+        subapartado_titulo = matiz.get("subapartado")
+        if not subapartado_titulo: continue
+
+        # Comprobamos el estado de este subapartado
+        prompts_existentes = [p for p in st.session_state.prompt_plan['plan_de_prompts'] if p.get('subapartado_referencia') == subapartado_titulo]
+        
+        with st.container(border=True):
+            col1, col2 = st.columns([2, 1])
+            with col1:
+                st.write(f"**{subapartado_titulo}**")
+                if prompts_existentes:
+                    st.success(f"✔️ Plan generado ({len(prompts_existentes)} prompts)")
+                    with st.expander("Ver prompts generados"):
+                        st.json(prompts_existentes)
+                else:
+                    st.info("⚪ Pendiente de generar plan de prompts")
+            
+            with col2:
+                if prompts_existentes:
+                    st.button("Re-generar Plan", key=f"gen_{i}", on_click=handle_individual_generation, args=(matiz,), use_container_width=True, type="secondary")
+                else:
+                    st.button("Generar Plan de Prompts", key=f"gen_{i}", on_click=handle_individual_generation, args=(matiz,), use_container_width=True, type="primary")
+
+    st.markdown("---")
+    if st.session_state.prompt_plan['plan_de_prompts']:
+        json_total_bytes = json.dumps(st.session_state.prompt_plan, indent=2, ensure_ascii=False).encode('utf-8')
+        st.download_button(
+            label="📥 Descargar Plan de Prompts Completo (JSON)",
+            data=json_total_bytes,
+            file_name="plan_de_prompts.json",
+            mime="application/json",
+            use_container_width=True
+        )
+
+    st.button("← Volver al Centro de Mando (F2)", on_click=go_to_phase2, use_container_width=True)
 # =============================================================================
 
 #                        LÓGICA PRINCIPAL (ROUTER) - VERSIÓN CORRECTA
@@ -1111,5 +1325,5 @@ else:
         phase_1_results_page()
     elif st.session_state.page == 'phase_2':
         phase_2_page()
-        
-    # La página 'phases' ya no existe en este nuevo flujo, por eso no se incluye.
+    elif st.session_state.page == 'phase_3':  # <-- ESTA ES LA LÍNEA QUE FALTABA
+        phase_3_page()                      # <-- Y ESTA TAMBIÉN
