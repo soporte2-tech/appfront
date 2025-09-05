@@ -44,7 +44,7 @@ ROOT_FOLDER_NAME = "ProyectosLicitaciones"
 
 
 # =============================================================================
-#           BLOQUE DE FUNCIONES DE DRIVE ROBUSTAS (CON REINTENTOS)
+#           BLOQUE DE FUNCIONES DE DRIVE DEFINITIVO (CON LAS 5 FUNCIONES)
 # =============================================================================
 
 def find_or_create_folder(service, folder_name, parent_id=None, retries=3):
@@ -69,7 +69,7 @@ def find_or_create_folder(service, folder_name, parent_id=None, retries=3):
         except (TimeoutError, httplib2.ServerNotFoundError) as e:
             if attempt < retries - 1:
                 st.toast(f"⏳ Error de red con Drive ({type(e).__name__}). Reintentando... ({attempt + 2}/{retries})")
-                time.sleep(2 ** attempt) # Espera 1, 2, 4 segundos...
+                time.sleep(2 ** attempt)
             else:
                 st.error("❌ No se pudo conectar con Google Drive. Por favor, refresca la página.")
                 raise
@@ -82,7 +82,6 @@ def upload_file_to_drive(service, file_object, folder_id, retries=3):
     for attempt in range(retries):
         try:
             file_metadata = {'name': file_object.name, 'parents': [folder_id]}
-            # Reiniciamos el puntero del archivo en cada reintento
             file_object.seek(0) 
             media = MediaIoBaseUpload(file_object, mimetype=file_object.type, resumable=True)
             file = service.files().create(body=file_metadata, media_body=media, fields='id').execute()
@@ -111,12 +110,30 @@ def delete_file_from_drive(service, file_id, retries=3):
                 time.sleep(2 ** attempt)
             else:
                 st.error(f"❌ No se pudo eliminar el archivo/carpeta tras varios intentos.")
-                # No lanzamos 'raise' para no romper la app, solo devolvemos False
                 return False
         except HttpError as error:
             st.error(f"No se pudo eliminar el archivo: {error}")
             return False
 
+def find_file_by_name(service, file_name, folder_id, retries=3):
+    """Busca un archivo por nombre dentro de una carpeta, con reintentos."""
+    query = f"name = '{file_name}' and '{folder_id}' in parents and trashed = false"
+    for attempt in range(retries):
+        try:
+            response = service.files().list(q=query, spaces='drive', fields='files(id)').execute()
+            files = response.get('files', [])
+            return files[0]['id'] if files else None
+        except (TimeoutError, httplib2.ServerNotFoundError) as e:
+            if attempt < retries - 1:
+                st.toast(f"⏳ Error de red buscando archivo. Reintentando... ({attempt + 2}/{retries})")
+                time.sleep(2 ** attempt)
+            else:
+                st.error(f"❌ No se pudo buscar el archivo '{file_name}' tras varios intentos.")
+                raise
+        except Exception as e:
+            st.error(f"Error inesperado al buscar archivo: {e}")
+            raise
+    
 def download_file_from_drive(service, file_id, retries=3):
     """Descarga el contenido de un archivo de Drive, con reintentos."""
     for attempt in range(retries):
@@ -139,7 +156,6 @@ def download_file_from_drive(service, file_id, retries=3):
         except Exception as e:
             st.error(f"Error inesperado al descargar: {e}")
             raise
-    
 # --- CONFIGURACIÓN DE LA PÁGINA ---
 st.set_page_config(page_title="Asistente de Licitaciones AI", layout="wide", initial_sidebar_state="collapsed")
 
