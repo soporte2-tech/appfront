@@ -1025,8 +1025,10 @@ def phase_1_results_page(model):
                         st.error(f"Ocurrió un error al guardar el índice: {e}")
 
 
-#           VERSIÓN DEFINITIVA de phase_2_page (CON TODA LA LÓGICA)
 # =============================================================================
+#           REEMPLAZA TU phase_2_page ACTUAL POR ESTA VERSIÓN COMPLETA
+# =============================================================================
+
 def phase_2_page(model):
     """Centro de mando para la generación y re-generación de guiones con documentación de apoyo."""
     st.markdown("<h3>FASE 2: Centro de Mando de Guiones</h3>", unsafe_allow_html=True)
@@ -1053,56 +1055,42 @@ def phase_2_page(model):
         except Exception as e:
             st.error(f"Error al cargar el índice desde Drive: {e}")
             return
+            
     matices = st.session_state.generated_structure.get('matices_desarrollo', [])
-    
-    # --- BUSCAR CARPETAS Y ARCHIVOS ---
-    with st.spinner("Sincronizando con Google Drive..."):
-        pliegos_folder_id = find_or_create_folder(service, "Pliegos", parent_id=project_folder_id)
-        guiones_folder_id = find_or_create_folder(service, "Guiones de Subapartados", parent_id=project_folder_id)
-        # La carpeta 'Contexto empresa' se sigue creando si no existe, pero ya no la usamos para subir archivos aquí.
-        contexto_folder_id = find_or_create_folder(service, "Contexto empresa", parent_id=project_folder_id)
-        
-        pliegos_en_drive = get_files_in_project(service, pliegos_folder_id)
-        
-        # <-- CAMBIO: Ya no listamos archivos, sino las CARPETAS de cada subapartado
-        query_subcarpetas = f"'{guiones_folder_id}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false"
-        response_subcarpetas = service.files().list(q=query_subcarpetas, spaces='drive', fields='files(id, name)').execute()
-        carpetas_de_guiones_existentes = {f['name']: f['id'] for f in response_subcarpetas.get('files', [])}
+    if not matices:
+        st.error("La estructura JSON no contiene 'matices_desarrollo' o está vacía. Vuelve a generar el índice.")
+        return
 
     # --- LÓGICA DE ACCIONES (GENERAR Y RE-GENERAR) ---
     def ejecutar_generacion(titulo, indicaciones):
         """Función para la generación inicial de un borrador."""
-        # Limpiamos el título para que sea un nombre de archivo/carpeta válido
         nombre_limpio = re.sub(r'[\\/*?:"<>|]', "", titulo)
         nombre_archivo = nombre_limpio + ".docx"
         
         with st.spinner(f"Generando borrador para '{titulo}'..."):
             try:
-                # 1. Crear la carpeta específica para este subapartado
+                guiones_folder_id = find_or_create_folder(service, "Guiones de Subapartados", parent_id=project_folder_id)
                 subapartado_guion_folder_id = find_or_create_folder(service, nombre_limpio, parent_id=guiones_folder_id)
+                pliegos_folder_id = find_or_create_folder(service, "Pliegos", parent_id=project_folder_id)
+                pliegos_en_drive = get_files_in_project(service, pliegos_folder_id)
 
-                # 2. Preparamos el contenido para la IA
                 contenido_ia = [PROMPT_PREGUNTAS_TECNICAS_INDIVIDUAL]
                 contenido_ia.append("--- INDICACIONES PARA ESTE APARTADO ---\n" + json.dumps(indicaciones, indent=2))
                 
-                # Añadimos los pliegos
                 for file_info in pliegos_en_drive:
                     file_content_bytes = download_file_from_drive(service, file_info['id'])
                     contenido_ia.append({"mime_type": file_info['mimeType'], "data": file_content_bytes.getvalue()})
                 
-                # Añadimos la documentación de apoyo si existe
                 doc_extra_key = f"upload_{titulo}"
                 if doc_extra_key in st.session_state and st.session_state[doc_extra_key]:
-                    doc_extra = st.session_state[doc_extra_key]
-                    contenido_ia.append("--- DOCUMENTACIÓN DE APOYO ADICIONAL ---\n")
-                    contenido_ia.append({"mime_type": doc_extra.type, "data": doc_extra.getvalue()})
-                    # 3. Guardamos el doc de apoyo en la NUEVA carpeta del subapartado
-                    upload_file_to_drive(service, doc_extra, subapartado_guion_folder_id)
+                    # Bucle para manejar múltiples archivos de apoyo
+                    for uploaded_file in st.session_state[doc_extra_key]:
+                        contenido_ia.append("--- DOCUMENTACIÓN DE APOYO ADICIONAL ---\n")
+                        contenido_ia.append({"mime_type": uploaded_file.type, "data": uploaded_file.getvalue()})
+                        upload_file_to_drive(service, uploaded_file, subapartado_guion_folder_id)
 
-                # Llamada a la IA
                 response = model.generate_content(contenido_ia)
                 
-                # Creación del DOCX
                 documento = docx.Document()
                 agregar_markdown_a_word(documento, response.text)
                 doc_io = io.BytesIO()
@@ -1111,7 +1099,6 @@ def phase_2_page(model):
                 word_file_obj.name = nombre_archivo
                 word_file_obj.type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                 
-                # 4. Guardamos el guion DOCX en la NUEVA carpeta del subapartado
                 upload_file_to_drive(service, word_file_obj, subapartado_guion_folder_id)
                 
                 st.toast(f"Borrador para '{titulo}' generado y guardado en su carpeta.")
@@ -1124,31 +1111,27 @@ def phase_2_page(model):
         nombre_archivo = re.sub(r'[\\/*?:"<>|]', "", titulo) + ".docx"
         with st.spinner(f"Re-generando '{titulo}' con feedback de Drive..."):
             try:
-                # 1. Obtener la carpeta padre del archivo ANTES de borrarlo
                 file_metadata = service.files().get(fileId=file_id_borrador, fields='parents').execute()
                 parent_folder_id = file_metadata.get('parents')[0] if file_metadata.get('parents') else None
                 if not parent_folder_id:
                     st.error("No se pudo encontrar la carpeta del guion original. Operación cancelada.")
                     return
 
-                # Descargamos el .docx de Drive y extraemos su texto
                 doc_bytes = download_file_from_drive(service, file_id_borrador)
                 documento_revisado = docx.Document(doc_bytes)
                 texto_revisado = "\n".join([p.text for p in documento_revisado.paragraphs])
                 
-                # Preparamos el contenido para la IA
+                pliegos_folder_id = find_or_create_folder(service, "Pliegos", parent_id=project_folder_id)
+                pliegos_en_drive = get_files_in_project(service, pliegos_folder_id)
                 contenido_ia = [PROMPT_CONSULTOR_REVISION]
                 contenido_ia.append("--- BORRADOR ORIGINAL / TEXTO REVISADO Y COMENTARIOS ---\n" + texto_revisado)
                 
-                # Añadimos los pliegos para contexto estratégico
                 for file_info in pliegos_en_drive:
                     file_content_bytes = download_file_from_drive(service, file_info['id'])
                     contenido_ia.append({"mime_type": file_info['mimeType'], "data": file_content_bytes.getvalue()})
 
-                # Llamada a la IA
                 response = model.generate_content(contenido_ia)
                 
-                # Creación del nuevo DOCX
                 documento = docx.Document()
                 agregar_markdown_a_word(documento, response.text)
                 doc_io = io.BytesIO()
@@ -1157,7 +1140,6 @@ def phase_2_page(model):
                 word_file_obj.name = nombre_archivo
                 word_file_obj.type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                 
-                # 2. Borramos el archivo antiguo y subimos el nuevo a la MISMA CARPETA PADRE
                 delete_file_from_drive(service, file_id_borrador)
                 upload_file_to_drive(service, word_file_obj, parent_folder_id)
                 
@@ -1170,25 +1152,30 @@ def phase_2_page(model):
         """Función para eliminar la carpeta de un guion y todo su contenido."""
         with st.spinner(f"Eliminando guion y contexto para '{titulo}'..."):
             try:
-                # Usamos la función que ya tenemos, ya que en Drive las carpetas son un tipo de 'file'
                 success = delete_file_from_drive(service, folder_id_to_delete)
                 if success:
                     st.toast(f"Guion para '{titulo}' eliminado correctamente.")
                     st.rerun()
                 else:
-                    # El error específico ya se mostraría dentro de delete_file_from_drive
                     st.error(f"No se pudo completar la eliminación de '{titulo}'.")
-
             except Exception as e:
                 st.error(f"Ocurrió un error inesperado al intentar borrar '{titulo}': {e}")
 
 
     # --- INTERFAZ DE GESTIÓN DE GUIONES ---
     st.subheader("Gestión de Guiones de Subapartados")
+    
+    with st.spinner("Sincronizando con Google Drive..."):
+        guiones_folder_id = find_or_create_folder(service, "Guiones de Subapartados", parent_id=project_folder_id)
+        query_subcarpetas = f"'{guiones_folder_id}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false"
+        response_subcarpetas = service.files().list(q=query_subcarpetas, spaces='drive', fields='files(id, name)').execute()
+        carpetas_de_guiones_existentes = {f['name']: f['id'] for f in response_subcarpetas.get('files', [])}
 
-    for i, item in enumerate(matices):
-        subapartado_titulo = item.get('subapartado')
-        if not subapartado_titulo: continue
+    # Bucle corregido para mostrar TODOS los subapartados
+    for i, matiz in enumerate(matices):
+        subapartado_titulo = matiz.get('subapartado')
+        if not subapartado_titulo:
+            continue
         
         nombre_limpio = re.sub(r'[\\/*?:"<>|]', "", subapartado_titulo)
         
@@ -1203,20 +1190,19 @@ def phase_2_page(model):
             subapartado_folder_id = None
 
         with st.container(border=True):
-            col1, col2 = st.columns([1.5, 2])
+            col1, col2 = st.columns([2, 1])
             with col1:
                 st.write(f"**{subapartado_titulo}**")
-
-                if estado == "📄 Generado":
-                    status_col, del_col = st.columns([3, 1])
-                    status_col.caption(f"Estado: {estado}")
-                    if del_col.button("🗑️", key=f"del_{i}", help="Eliminar guion y su carpeta en Drive"):
-                        ejecutar_borrado(subapartado_titulo, subapartado_folder_id)
-                else:
-                    st.caption(f"Estado: {estado}")
+                st.caption(f"Estado: {estado}")
 
                 if estado == "⚪ No Generado":
-                    st.file_uploader("Aportar documentación de apoyo", type=['pdf', 'docx', 'txt'], key=f"upload_{subapartado_titulo}", label_visibility="collapsed")
+                    st.file_uploader(
+                        "Aportar documentación de apoyo",
+                        type=['pdf', 'docx', 'txt'],
+                        key=f"upload_{subapartado_titulo}", # Key única y persistente
+                        accept_multiple_files=True,
+                        label_visibility="collapsed"
+                    )
 
             with col2:
                 btn_container = st.container()
@@ -1225,22 +1211,20 @@ def phase_2_page(model):
                     btn_container.link_button("Revisar en Drive", link, use_container_width=True)
                     if btn_container.button("Re-Generar con Feedback", key=f"regen_{i}", type="primary", use_container_width=True):
                         ejecutar_regeneracion(subapartado_titulo, file_info['id'])
+                    if btn_container.button("🗑️ Borrar", key=f"del_{i}", help="Eliminar guion y su carpeta", use_container_width=True):
+                         ejecutar_borrado(subapartado_titulo, subapartado_folder_id)
                 else:
                     if btn_container.button("Generar Borrador", key=f"gen_{i}", use_container_width=True):
-                        indicaciones = next((m for m in matices if m['subapartado'] == subapartado_titulo), None)
-                        ejecutar_generacion(subapartado_titulo, indicaciones)
+                        ejecutar_generacion(subapartado_titulo, matiz)
 
-    # --- AQUÍ EMPIEZA LA PARTE AÑADIDA ---
-    # (Justo después de que termine el bucle for)
+    # --- NAVEGACIÓN ---
     st.markdown("---")
-    # Botones de navegación al final de la página
     col_nav1, col_nav2 = st.columns(2)
     with col_nav1:
         st.button("← Volver a Revisión de Índice (F1)", on_click=go_to_phase1_results, use_container_width=True)
     with col_nav2:
         st.button("Ir a Plan de Prompts (F3) →", on_click=go_to_phase3, use_container_width=True)
-
-
+        
 # =============================================================================
 #           FASE 3 - CENTRO DE MANDO DE PROMPTS (VERSIÓN FINAL COMPLETA)
 # =============================================================================
