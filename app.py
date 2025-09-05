@@ -1018,7 +1018,22 @@ def phase_2_page():
                 st.rerun()
             except Exception as e:
                 st.error(f"Error al re-generar '{titulo}': {e}")
+                
+    def ejecutar_borrado(titulo, folder_id_to_delete):
+        """Función para eliminar la carpeta de un guion y todo su contenido."""
+        with st.spinner(f"Eliminando guion y contexto para '{titulo}'..."):
+            try:
+                # Usamos la función que ya tenemos, ya que en Drive las carpetas son un tipo de 'file'
+                success = delete_file_from_drive(service, folder_id_to_delete)
+                if success:
+                    st.toast(f"Guion para '{titulo}' eliminado correctamente.")
+                    st.rerun()
+                else:
+                    # El error específico ya se mostraría dentro de delete_file_from_drive
+                    st.error(f"No se pudo completar la eliminación de '{titulo}'.")
 
+            except Exception as e:
+                st.error(f"Ocurrió un error inesperado al intentar borrar '{titulo}': {e}")
 
 
         # --- INTERFAZ DE GESTIÓN DE GUIONES ---
