@@ -1375,4 +1375,5 @@ else:
         phase_2_page()
         
     elif st.session_state.page == 'phase_3':
+        phase_3_page()
 
