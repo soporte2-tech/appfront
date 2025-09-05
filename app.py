@@ -1185,7 +1185,7 @@ def phase_2_page(model):
 #           FASE 3 - CENTRO DE MANDO DE PROMPTS (VERSIÓN FINAL COMPLETA)
 # =============================================================================
 
-def phase_3_page(model_obj):
+def phase_3_page(model):
     """Página interactiva para generar, descargar y unificar planes de prompts."""
     st.markdown("<h3>FASE 3: Centro de Mando de Prompts</h3>", unsafe_allow_html=True)
     st.markdown("Genera planes de prompts individuales para los apartados que necesites. Cuando termines, unifícalos en un solo plan maestro para la redacción final.")
@@ -1211,7 +1211,7 @@ def phase_3_page(model_obj):
     matices = st.session_state.generated_structure.get('matices_desarrollo', [])
     
     # --- FUNCIÓN INTERNA DE GENERACIÓN INDIVIDUAL ---
-    def handle_individual_generation(matiz_info, callback_model_obj):
+    def handle_individual_generation(matiz_info, callback_model):
         apartado_titulo = matiz_info.get("apartado", "N/A")
         subapartado_titulo = matiz_info.get("subapartado", "N/A")
         
@@ -1249,7 +1249,7 @@ def phase_3_page(model_obj):
                 contenido_ia = [prompt_final] + pliegos_content_for_ia
                 generation_config = genai.GenerationConfig(response_mime_type="application/json")
                 
-                response = callback_model_obj.generate_content(contenido_ia, generation_config=generation_config)
+                response = callback_model.generate_content(contenido_ia, generation_config=generation_config)
                 
                 json_limpio_str = limpiar_respuesta_json(response.text)
                 if json_limpio_str:
@@ -1344,21 +1344,20 @@ def phase_3_page(model_obj):
             
             with col2:
                 if plan_individual_id:
-                    st.button("Re-generar Plan", key=f"gen_{i}", on_click=handle_individual_generation, args=(matiz, model_obj), use_container_width=True, type="secondary", disabled=not guion_generado)
+                    st.button("Re-generar Plan", key=f"gen_{i}", on_click=handle_individual_generation, args=(matiz, model), use_container_width=True, type="secondary", disabled=not guion_generado)
                 else:
-                    st.button("Generar Plan de Prompts", key=f"gen_{i}", on_click=handle_individual_generation, args=(matiz, model_obj), use_container_width=True, type="primary", disabled=not guion_generado)
+                    st.button("Generar Plan de Prompts", key=f"gen_{i}", on_click=handle_individual_generation, args=(matiz, model), use_container_width=True, type="primary", disabled=not guion_generado)
 
+    # --- BOTONES DE NAVEGACIÓN (VERSIÓN CORREGIDA) ---
     st.markdown("---")
-col_nav3_1, col_nav3_2 = st.columns(2)
-with col_nav3_1:
-    st.button("🚀 Generar Plan de Prompts Conjunto", on_click=handle_conjunto_generation, use_container_width=True, type="primary", help="Unifica todos los planes individuales generados en un único archivo maestro.")
+    col_nav3_1, col_nav3_2 = st.columns(2)
+    with col_nav3_1:
+        st.button("🚀 Generar Plan de Prompts Conjunto", on_click=handle_conjunto_generation, use_container_width=True, type="primary", help="Unifica todos los planes individuales generados en un único archivo maestro.")
 
-with col_nav3_2:
-    st.button("Ir a Redacción Final (F4) →", on_click=go_to_phase4, use_container_width=True)
+    with col_nav3_2:
+        st.button("Ir a Redacción Final (F4) →", on_click=go_to_phase4, use_container_width=True)
 
-
-st.button("← Volver al Centro de Mando (F2)", on_click=go_to_phase2, use_container_width=True)
-
+    st.button("← Volver al Centro de Mando (F2)", on_click=go_to_phase2, use_container_width=True)
 # =============================================================================
 #           FASE 4 - REDACCIÓN Y ENSAMBLAJE FINAL
 # =============================================================================
