@@ -1375,6 +1375,4 @@ else:
         phase_2_page()
         
     elif st.session_state.page == 'phase_3':
-        # --- 3. CAMBIO EN LA LLAMADA A LA PÁGINA ---
-        # Ahora le pasamos la variable 'model' a la función
-        phase_3_page(model)
+
