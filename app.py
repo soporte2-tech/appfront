@@ -1036,7 +1036,7 @@ def phase_2_page():
                 st.error(f"Ocurrió un error inesperado al intentar borrar '{titulo}': {e}")
 
 
-        # --- INTERFAZ DE GESTIÓN DE GUIONES ---
+    # --- INTERFAZ DE GESTIÓN DE GUIONES ---
     st.subheader("Gestión de Guiones de Subapartados")
 
     for i, item in enumerate(matices):
@@ -1045,28 +1045,37 @@ def phase_2_page():
         
         nombre_limpio = re.sub(r'[\\/*?:"<>|]', "", subapartado_titulo)
         
-        # <-- CAMBIO: Comprobamos si existe la CARPETA del subapartado
         if nombre_limpio in carpetas_de_guiones_existentes:
             estado = "📄 Generado"
             subapartado_folder_id = carpetas_de_guiones_existentes[nombre_limpio]
-            # <-- CAMBIO: Buscamos el archivo .docx DENTRO de la subcarpeta
             files_in_subfolder = get_files_in_project(service, subapartado_folder_id)
             file_info = next((f for f in files_in_subfolder if f['name'].endswith('.docx')), None)
         else:
             estado = "⚪ No Generado"
             file_info = None
+            subapartado_folder_id = None # <-- NUEVA LÍNEA: Aseguramos que es None si no existe
 
         with st.container(border=True):
             col1, col2 = st.columns([1.5, 2])
             with col1:
                 st.write(f"**{subapartado_titulo}**")
-                st.caption(f"Estado: {estado}")
+
+                # --- BLOQUE MODIFICADO PARA INCLUIR EL BOTÓN DE BORRAR ---
+                if estado == "📄 Generado":
+                    status_col, del_col = st.columns([3, 1])
+                    status_col.caption(f"Estado: {estado}")
+                    if del_col.button("🗑️", key=f"del_{i}", help="Eliminar guion y su carpeta en Drive"):
+                        ejecutar_borrado(subapartado_titulo, subapartado_folder_id)
+                else:
+                    st.caption(f"Estado: {estado}")
+                # --- FIN DEL BLOQUE MODIFICADO ---
+
                 if estado == "⚪ No Generado":
                     st.file_uploader("Aportar documentación de apoyo", type=['pdf', 'docx', 'txt'], key=f"upload_{subapartado_titulo}", label_visibility="collapsed")
 
             with col2:
                 btn_container = st.container()
-                if estado == "📄 Generado" and file_info: # <-- CAMBIO: Nos aseguramos de que el archivo .docx existe
+                if estado == "📄 Generado" and file_info:
                     link = f"https://docs.google.com/document/d/{file_info['id']}/edit"
                     btn_container.link_button("Revisar en Drive", link, use_container_width=True)
                     if btn_container.button("Re-Generar con Feedback", key=f"regen_{i}", type="primary", use_container_width=True):
@@ -1075,13 +1084,6 @@ def phase_2_page():
                     if btn_container.button("Generar Borrador", key=f"gen_{i}", use_container_width=True):
                         indicaciones = next((m for m in matices if m['subapartado'] == subapartado_titulo), None)
                         ejecutar_generacion(subapartado_titulo, indicaciones)
-    
-    st.markdown("---")
-    col_nav1, col_nav2 = st.columns(2)
-    with col_nav1:
-        st.button("← Volver a Revisión de Índice (F1)", on_click=go_to_phase1_results, use_container_width=True)
-    with col_nav2:
-        st.button("Ir a Plan de Prompts (F3) →", on_click=go_to_phase3, use_container_width=True)
 # =============================================================================
 
 #                        LÓGICA PRINCIPAL (ROUTER) - VERSIÓN CORRECTA
