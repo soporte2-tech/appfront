@@ -421,7 +421,7 @@ Tu única tarea es generar una **NUEVA VERSIÓN MEJORADA** del objeto JSON que i
 Genera únicamente el objeto JSON corregido. No incluyas ningún texto fuera de él.
 """
 
-PROMPT_DESARROLLO = f"""
+PROMPT_DESARROLLO = """
     Actúa como un consultor experto redactando una memoria técnica para una licitación pública. Debes hacer una memoria técnica seria, pero amena de leer con algunos (sin excederse) elementos gráficos, tablas y listas que hagan la lectura más fácil y profesional.
     Tu tarea es crear los prompts que darán forma al texto de este subapartado. Es por ello que debes que tener en cuenta que estas indicaciones
     deben tener todo tipo de detalles para que otra IA sea capaz de con ese contexto recibirlo y generar el contenido final de la mejor manera posible.
@@ -494,8 +494,7 @@ PROMPT_DESARROLLO = f"""
 
 
     Genera un texto profesional, bien estructurado y que responda directamente a las indicaciones. No añadas introducciones o conclusiones que no se pidan.
-    """
-
+"""
 # =============================================================================
 #              NUEVAS FUNCIONES: AUTENTICACIÓN Y GOOGLE DRIVE
 # =============================================================================
