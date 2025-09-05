@@ -1184,7 +1184,7 @@ def phase_2_page():
 #           FASE 3 - CENTRO DE MANDO DE PROMPTS (VERSIÓN FINAL COMPLETA)
 # =============================================================================
 
-def phase_3_page():
+def phase_3_page(model_obj):
     """Página interactiva para generar, descargar y unificar planes de prompts."""
     st.markdown("<h3>FASE 3: Centro de Mando de Prompts</h3>", unsafe_allow_html=True)
     st.markdown("Genera planes de prompts individuales para los apartados que necesites. Cuando termines, unifícalos en un solo plan maestro para la redacción final.")
@@ -1209,9 +1209,8 @@ def phase_3_page():
 
     matices = st.session_state.generated_structure.get('matices_desarrollo', [])
     
-# --- FUNCIÓN INTERNA DE GENERACIÓN INDIVIDUAL (CORREGIDA) ---
-# --- FUNCIÓN INTERNA DE GENERACIÓN INDIVIDUAL (CORREGIDA) ---
-    def handle_individual_generation(matiz_info, model_obj):
+    # --- FUNCIÓN INTERNA DE GENERACIÓN INDIVIDUAL ---
+    def handle_individual_generation(matiz_info, callback_model_obj):
         apartado_titulo = matiz_info.get("apartado", "N/A")
         subapartado_titulo = matiz_info.get("subapartado", "N/A")
         
@@ -1249,7 +1248,7 @@ def phase_3_page():
                 contenido_ia = [prompt_final] + pliegos_content_for_ia
                 generation_config = genai.GenerationConfig(response_mime_type="application/json")
                 
-                response = model_obj.generate_content(contenido_ia, generation_config=generation_config)
+                response = callback_model_obj.generate_content(contenido_ia, generation_config=generation_config)
                 
                 json_limpio_str = limpiar_respuesta_json(response.text)
                 if json_limpio_str:
@@ -1268,7 +1267,6 @@ def phase_3_page():
                     st.toast(f"Plan para '{subapartado_titulo}' guardado en su carpeta de Drive.")
 
             except Exception as e:
-                # --- ESTA ES LA LÍNEA CORREGIDA ---
                 st.error(f"Error generando prompts para '{subapartado_titulo}': {e}")
     
     # --- FUNCIÓN PARA UNIFICAR PLANES ---
@@ -1307,7 +1305,7 @@ def phase_3_page():
             except Exception as e:
                 st.error(f"Error al generar el plan conjunto: {e}")
 
-    # --- INTERFAZ DE USUARIO (CORREGIDA) ---
+    # --- INTERFAZ DE USUARIO ---
     with st.spinner("Verificando estado de los guiones y planes..."):
         guiones_main_folder_id = find_or_create_folder(service, "Guiones de Subapartados", parent_id=project_folder_id)
         query_subcarpetas = f"'{guiones_main_folder_id}' in parents and trashed = false"
@@ -1345,30 +1343,25 @@ def phase_3_page():
             
             with col2:
                 if plan_individual_id:
-                    # <--- 2. PASAMOS LA VARIABLE 'model' EN LOS ARGUMENTOS
-                    st.button("Re-generar Plan", key=f"gen_{i}", on_click=handle_individual_generation, args=(matiz, model), use_container_width=True, type="secondary", disabled=not guion_generado)
+                    st.button("Re-generar Plan", key=f"gen_{i}", on_click=handle_individual_generation, args=(matiz, model_obj), use_container_width=True, type="secondary", disabled=not guion_generado)
                 else:
-                    # <--- 2. PASAMOS LA VARIABLE 'model' EN LOS ARGUMENTOS
-                    st.button("Generar Plan de Prompts", key=f"gen_{i}", on_click=handle_individual_generation, args=(matiz, model), use_container_width=True, type="primary", disabled=not guion_generado)
+                    st.button("Generar Plan de Prompts", key=f"gen_{i}", on_click=handle_individual_generation, args=(matiz, model_obj), use_container_width=True, type="primary", disabled=not guion_generado)
+
+    st.markdown("---")
+    st.button("🚀 Generar Plan de Prompts Conjunto", on_click=handle_conjunto_generation, use_container_width=True, type="primary", help="Unifica todos los planes individuales generados en un único archivo maestro.")
+    st.caption("La 'Redacción Final' será el siguiente paso.")
+    
+    st.button("← Volver al Centro de Mando (F2)", on_click=go_to_phase2, use_container_width=True)
                     
 # =============================================================================
-
-#                        LÓGICA PRINCIPAL (ROUTER) - VERSIÓN CORRECTA
+#                        LÓGICA PRINCIPAL (ROUTER) - VERSIÓN CORREGIDA FINAL
 # =============================================================================
 
-# Primero, SIEMPRE comprobamos si tenemos credenciales de usuario.
 credentials = get_credentials()
 
-# Si NO hay credenciales, el usuario no ha iniciado sesión.
 if not credentials:
-    # La única página que puede ver es la de bienvenida para que inicie sesión.
     landing_page()
-
-# Si SÍ hay credenciales, el usuario ya ha iniciado sesión.
 else:
-    # Ahora que sabemos que está dentro, miramos en qué página quiere estar.
-    # Si acaba de iniciar sesión, su 'page' será 'landing', así que lo llevamos
-    # a la selección de proyectos.
     if st.session_state.page == 'landing' or st.session_state.page == 'project_selection':
         project_selection_page()
     
@@ -1377,7 +1370,11 @@ else:
         
     elif st.session_state.page == 'phase_1_results':
         phase_1_results_page()
+        
     elif st.session_state.page == 'phase_2':
         phase_2_page()
-    elif st.session_state.page == 'phase_3':  # <-- ESTA ES LA LÍNEA QUE FALTABA
-        phase_3_page()                      # <-- Y ESTA TAMBIÉN
+        
+    elif st.session_state.page == 'phase_3':
+        # --- 3. CAMBIO EN LA LLAMADA A LA PÁGINA ---
+        # Ahora le pasamos la variable 'model' a la función
+        phase_3_page(model)
