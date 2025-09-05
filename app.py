@@ -1353,38 +1353,31 @@ def phase_3_page(model_obj):
     
     st.button("← Volver al Centro de Mando (F2)", on_click=go_to_phase2, use_container_width=True)
                     
-# =============================================================================
-# =============================================================================
-#           CONFIGURACIÓN DE API Y LÓGICA PRINCIPAL (VERSIÓN FINAL)
+#                        LÓGICA PRINCIPAL (ROUTER) - VERSIÓN CORRECTA
 # =============================================================================
 
-try:
-    # ----------------------------------------------------
-    # 1. PREPARACIÓN (Esto se ejecuta SIEMPRE primero)
-    # ----------------------------------------------------
-    api_key = st.secrets["GEMINI_API_KEY"]
-    genai.configure(api_key=api_key)
-    model = genai.GenerativeModel('gemini-1.5-flash')
+# Primero, SIEMPRE comprobamos si tenemos credenciales de usuario.
+credentials = get_credentials()
 
-    # -------------------------------------------------------------------------
-    # 2. LÓGICA DE LA APP (Usa el 'model' que acabamos de crear)
-    # -------------------------------------------------------------------------
-    credentials = get_credentials()
+# Si NO hay credenciales, el usuario no ha iniciado sesión.
+if not credentials:
+    # La única página que puede ver es la de bienvenida para que inicie sesión.
+    landing_page()
 
-    if not credentials:
-        landing_page()
-    else:
-        # ... aquí va tu router
-        if st.session_state.page == 'phase_2':
-            # Le pasamos el 'model' ya preparado a la página
-            phase_2_page(model) 
-        elif st.session_state.page == 'phase_3':
-            # Le pasamos el 'model' ya preparado a la página
-            phase_3_page(model)
-
-except Exception as e:
-    # Si la PREPARACIÓN falla (ej: API Key incorrecta),
-    # la app muestra un error y se detiene.
-    st.error(f"Error crítico al iniciar la aplicación...")
-    st.stop()
-
+# Si SÍ hay credenciales, el usuario ya ha iniciado sesión.
+else:
+    # Ahora que sabemos que está dentro, miramos en qué página quiere estar.
+    # Si acaba de iniciar sesión, su 'page' será 'landing', así que lo llevamos
+    # a la selección de proyectos.
+    if st.session_state.page == 'landing' or st.session_state.page == 'project_selection':
+        project_selection_page()
+    
+    elif st.session_state.page == 'phase_1':
+        phase_1_page()
+        
+    elif st.session_state.page == 'phase_1_results':
+        phase_1_results_page()
+    elif st.session_state.page == 'phase_2':
+        phase_2_page()
+        
+    # La página 'phases' ya no existe en este nuevo flujo, por eso no se incluye.
