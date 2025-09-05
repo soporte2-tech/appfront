@@ -1256,14 +1256,6 @@ def phase_2_page(model):
         st.button("← Volver a Revisión de Índice (F1)", on_click=go_to_phase1_results, use_container_width=True)
     with col_nav2:
         st.button("Ir a Plan de Prompts (F3) →", on_click=go_to_phase3, use_container_width=True)
-
-    # --- NAVEGACIÓN ---
-    st.markdown("---")
-    col_nav1, col_nav2 = st.columns(2)
-    with col_nav1:
-        st.button("← Volver a Revisión de Índice (F1)", on_click=go_to_phase1_results, use_container_width=True)
-    with col_nav2:
-        st.button("Ir a Plan de Prompts (F3) →", on_click=go_to_phase3, use_container_width=True)
         
 # =============================================================================
 #           FASE 3 - CENTRO DE MANDO DE PROMPTS (VERSIÓN FINAL COMPLETA)
