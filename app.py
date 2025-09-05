@@ -45,38 +45,41 @@ ROOT_FOLDER_NAME = "ProyectosLicitaciones"
 
 # --- FUNCIONES DE INTERACCIÓN CON GOOGLE DRIVE ---
 
-def find_or_create_folder(service, folder_name, parent_id=None, folder_id=None, retries=3):
-    """Busca/crea una carpeta con reintentos. Si se da un folder_id, lo devuelve directamente."""
-    
-    if folder_id:
-        return folder_id
+# REEMPLAZA TU FUNCIÓN find_or_create_folder POR ESTA VERSIÓN COMPLETA
 
+def find_or_create_folder(service, folder_name, parent_id=None, retries=3):
+    """Busca una carpeta por nombre. Si no la encuentra, la crea. Incluye reintentos para errores de red."""
     query = f"name = '{folder_name}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false"
     if parent_id:
         query += f" and '{parent_id}' in parents"
     
+    # Bucle de reintentos
     for attempt in range(retries):
         try:
+            # Intento 1: Listar para ver si ya existe
             response = service.files().list(q=query, spaces='drive', fields='files(id, name)').execute()
             files = response.get('files', [])
             
             if files:
-                return files[0]['id']
+                return files[0]['id'] # Si existe, la devolvemos y salimos
             else:
+                # Intento 2: Crear la carpeta si no existe
                 file_metadata = {'name': folder_name, 'mimeType': 'application/vnd.google-apps.folder'}
                 if parent_id:
                     file_metadata['parents'] = [parent_id]
                 folder = service.files().create(body=file_metadata, fields='id').execute()
                 st.toast(f"Carpeta '{folder_name}' creada en tu Drive.")
-                return folder.get('id')
+                return folder.get('id') # Devolvemos la nueva ID y salimos
+
         except TimeoutError:
-            if attempt < retries - 1:
-                st.toast(f"Timeout al conectar con Drive. Reintentando ({attempt + 1}/{retries-1})...")
-                time.sleep(2) 
+            if attempt < retries - 1: # Si aún nos quedan intentos
+                st.toast(f"⏳ Timeout al conectar con Drive. Reintentando en 2s... ({attempt + 2}/{retries})")
+                time.sleep(2) # Esperamos 2 segundos antes del siguiente intento
             else:
-                st.error("No se pudo conectar con Google Drive después de varios intentos.")
-                raise
+                st.error("❌ No se pudo conectar con Google Drive después de varios intentos. Refresca la página.")
+                raise # Si era el último intento, lanzamos el error para detener la app
         except Exception as e:
+            # Capturamos otros posibles errores de la API para no bloquear la app
             st.error(f"Ocurrió un error inesperado con Google Drive: {e}")
             raise
 
