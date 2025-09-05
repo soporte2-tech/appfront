@@ -1202,13 +1202,21 @@ def handle_individual_generation(matiz_info):
     apartado_titulo = matiz_info.get("apartado", "N/A")
     subapartado_titulo = matiz_info.get("subapartado", "N/A")
     
+    # Obtenemos el service y project_folder_id del scope superior
+    service = st.session_state.drive_service
+    project_folder_id = st.session_state.selected_project['id']
+    prompt_plan_file_id = find_file_by_name(service, "plan_de_prompts.json", find_or_create_folder(service, "Documentos aplicación", parent_id=project_folder_id))
+
+
     with st.spinner(f"Generando prompts para: '{subapartado_titulo}'..."):
         try:
+            # --- LÍNEA CORREGIDA Y AÑADIDA ---
+            # Primero nos aseguramos de tener el ID de la carpeta principal de guiones
+            guiones_main_folder_id = find_or_create_folder(service, "Guiones de Subapartados", parent_id=project_folder_id)
+            
             # 1. RECOLECTAR CONTEXTO DE FASE 2
             nombre_limpio = re.sub(r'[\\/*?:"<>|]', "", subapartado_titulo)
-            guiones_main_folder_id = find_or_create_folder(service, "Guiones de Subapartados", parent_id=project_folder_id)
-            # Usamos find_or_create_folder para buscar la carpeta, ya que no especificamos mimeType
-            subapartado_folder_id = find_file_by_name(service, nombre_limpio, guiones_main_folder_id) 
+            subapartado_folder_id = find_file_by_name(service, nombre_limpio, guiones_main_folder_id)
             
             contexto_adicional_str = ""
             if subapartado_folder_id:
@@ -1216,11 +1224,11 @@ def handle_individual_generation(matiz_info):
                 for file_info in files_in_subfolder:
                     file_bytes = download_file_from_drive(service, file_info['id'])
                     if file_info['name'].endswith('.docx'):
-                        doc = docx.Document(file_bytes)
+                        doc = docx.Document(io.BytesIO(file_bytes.getvalue()))
                         texto_doc = "\n".join([p.text for p in doc.paragraphs])
                         contexto_adicional_str += f"\n--- CONTENIDO DEL GUION ({file_info['name']}) ---\n{texto_doc}\n"
                     elif file_info['name'].endswith('.pdf'):
-                        reader = PdfReader(file_bytes)
+                        reader = PdfReader(io.BytesIO(file_bytes.getvalue()))
                         texto_pdf = "".join(page.extract_text() for page in reader.pages)
                         contexto_adicional_str += f"\n--- CONTENIDO DEL PDF DE APOYO ({file_info['name']}) ---\n{texto_pdf}\n"
 
@@ -1256,16 +1264,14 @@ def handle_individual_generation(matiz_info):
                 mock_file_obj.name = "plan_de_prompts.json"
                 mock_file_obj.type = "application/json"
                 
+                docs_app_folder_id = find_or_create_folder(service, "Documentos aplicación", parent_id=project_folder_id)
                 if prompt_plan_file_id: delete_file_from_drive(service, prompt_plan_file_id)
                 upload_file_to_drive(service, mock_file_obj, docs_app_folder_id)
                 
                 st.toast(f"Plan de prompts para '{subapartado_titulo}' generado y guardado.")
-                # La línea st.rerun() ha sido eliminada de aquí. Streamlit lo hará automáticamente.
 
         except Exception as e:
             st.error(f"Error generando prompts para '{subapartado_titulo}': {e}")
-
-
     # --- INTERFAZ DE USUARIO ---
     for i, matiz in enumerate(matices):
         subapartado_titulo = matiz.get("subapartado")
