@@ -566,13 +566,6 @@ PROMPT_DESARROLLO = """
     Genera un texto profesional, bien estructurado y que responda directamente a las indicaciones. No añadas introducciones o conclusiones que no se pidan.
 """
 
-### Pasos a Seguir:
-
-1.  **Reemplaza** el `PROMPT_DESARROLLO` en tu `app.py` con el código de arriba.
-2.  **Guarda y reinicia** ("Reboot") tu aplicación de Streamlit.
-3.  **Vuelve a la Fase 3** y haz clic en "Generar Plan de Prompts" para el apartado que estaba fallando.
-
-Ahora sí, con este prompt completo y totalmente "escapado", el error `KeyError` desaparecerá y podrás generar los planes de prompts sin problemas.
 # =============================================================================
 #              NUEVAS FUNCIONES: AUTENTICACIÓN Y GOOGLE DRIVE
 # =============================================================================
