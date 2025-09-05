@@ -1026,7 +1026,7 @@ def phase_1_results_page(model):
 
 
 # =============================================================================
-#           REEMPLAZA TU phase_2_page ACTUAL POR ESTA VERSIÓN COMPLETA
+#           REEMPLAZA TU phase_2_page ACTUAL POR ESTA VERSIÓN DEFINITIVA
 # =============================================================================
 
 def phase_2_page(model):
@@ -1047,7 +1047,7 @@ def phase_2_page(model):
             if saved_index_id:
                 index_content_bytes = download_file_from_drive(service, saved_index_id)
                 st.session_state.generated_structure = json.loads(index_content_bytes.getvalue().decode('utf-8'))
-                st.rerun() # Refrescamos para que el resto de la página cargue con el índice
+                st.rerun() 
             else:
                 st.warning("No se ha encontrado un índice guardado. Por favor, vuelve a la Fase 1 para generar uno.")
                 if st.button("← Ir a Fase 1"): go_to_phase1(); st.rerun()
@@ -1055,15 +1055,51 @@ def phase_2_page(model):
         except Exception as e:
             st.error(f"Error al cargar el índice desde Drive: {e}")
             return
-            
-    matices = st.session_state.generated_structure.get('matices_desarrollo', [])
-    if not matices:
-        st.error("La estructura JSON no contiene 'matices_desarrollo' o está vacía. Vuelve a generar el índice.")
+
+    # =============================================================================
+    #           INICIO DEL CAMBIO CLAVE: CONSTRUCCIÓN DE LISTA A PRUEBA DE FALLOS
+    # =============================================================================
+    
+    estructura = st.session_state.generated_structure.get('estructura_memoria', [])
+    matices_originales = st.session_state.generated_structure.get('matices_desarrollo', [])
+    
+    # Creamos un diccionario para buscar matices fácilmente por el título del subapartado
+    matices_dict = {item.get('subapartado', ''): item for item in matices_originales}
+    
+    # Construimos nuestra propia lista completa y robusta
+    subapartados_a_mostrar = []
+    if not estructura:
+        st.error("La estructura JSON no contiene la clave 'estructura_memoria'. Vuelve a generar el índice.")
         return
 
+    for seccion in estructura:
+        apartado_principal = seccion.get('apartado', 'Sin Título')
+        for subapartado_titulo in seccion.get('subapartados', []):
+            # Buscamos si hay un matiz detallado para este subapartado
+            matiz_existente = matices_dict.get(subapartado_titulo)
+            
+            if matiz_existente:
+                # Si lo encontramos, lo usamos tal cual
+                subapartados_a_mostrar.append(matiz_existente)
+            else:
+                # Si no existe, creamos una entrada básica para asegurar que se muestre en la UI
+                subapartados_a_mostrar.append({
+                    "apartado": apartado_principal,
+                    "subapartado": subapartado_titulo,
+                    "indicaciones": "No se encontraron indicaciones detalladas para este apartado en el JSON."
+                })
+
+    if not subapartados_a_mostrar:
+        st.warning("El índice no parece contener ningún subapartado para gestionar.")
+        return
+        
+    # =============================================================================
+    #           FIN DEL CAMBIO CLAVE. AHORA USAMOS 'subapartados_a_mostrar'
+    # =============================================================================
+
+
     # --- LÓGICA DE ACCIONES (GENERAR Y RE-GENERAR) ---
-    def ejecutar_generacion(titulo, indicaciones):
-        """Función para la generación inicial de un borrador."""
+    def ejecutar_generacion(titulo, indicaciones_completas):
         nombre_limpio = re.sub(r'[\\/*?:"<>|]', "", titulo)
         nombre_archivo = nombre_limpio + ".docx"
         
@@ -1075,7 +1111,7 @@ def phase_2_page(model):
                 pliegos_en_drive = get_files_in_project(service, pliegos_folder_id)
 
                 contenido_ia = [PROMPT_PREGUNTAS_TECNICAS_INDIVIDUAL]
-                contenido_ia.append("--- INDICACIONES PARA ESTE APARTADO ---\n" + json.dumps(indicaciones, indent=2))
+                contenido_ia.append("--- INDICACIONES PARA ESTE APARTADO ---\n" + json.dumps(indicaciones_completas, indent=2, ensure_ascii=False))
                 
                 for file_info in pliegos_en_drive:
                     file_content_bytes = download_file_from_drive(service, file_info['id'])
@@ -1083,7 +1119,6 @@ def phase_2_page(model):
                 
                 doc_extra_key = f"upload_{titulo}"
                 if doc_extra_key in st.session_state and st.session_state[doc_extra_key]:
-                    # Bucle para manejar múltiples archivos de apoyo
                     for uploaded_file in st.session_state[doc_extra_key]:
                         contenido_ia.append("--- DOCUMENTACIÓN DE APOYO ADICIONAL ---\n")
                         contenido_ia.append({"mime_type": uploaded_file.type, "data": uploaded_file.getvalue()})
@@ -1107,7 +1142,6 @@ def phase_2_page(model):
                 st.error(f"Error al generar '{titulo}': {e}")
 
     def ejecutar_regeneracion(titulo, file_id_borrador):
-        """Función para la re-generación con feedback."""
         nombre_archivo = re.sub(r'[\\/*?:"<>|]', "", titulo) + ".docx"
         with st.spinner(f"Re-generando '{titulo}' con feedback de Drive..."):
             try:
@@ -1118,7 +1152,7 @@ def phase_2_page(model):
                     return
 
                 doc_bytes = download_file_from_drive(service, file_id_borrador)
-                documento_revisado = docx.Document(doc_bytes)
+                documento_revisado = docx.Document(io.BytesIO(doc_bytes.getvalue()))
                 texto_revisado = "\n".join([p.text for p in documento_revisado.paragraphs])
                 
                 pliegos_folder_id = find_or_create_folder(service, "Pliegos", parent_id=project_folder_id)
@@ -1149,7 +1183,6 @@ def phase_2_page(model):
                 st.error(f"Error al re-generar '{titulo}': {e}")
                 
     def ejecutar_borrado(titulo, folder_id_to_delete):
-        """Función para eliminar la carpeta de un guion y todo su contenido."""
         with st.spinner(f"Eliminando guion y contexto para '{titulo}'..."):
             try:
                 success = delete_file_from_drive(service, folder_id_to_delete)
@@ -1161,7 +1194,6 @@ def phase_2_page(model):
             except Exception as e:
                 st.error(f"Ocurrió un error inesperado al intentar borrar '{titulo}': {e}")
 
-
     # --- INTERFAZ DE GESTIÓN DE GUIONES ---
     st.subheader("Gestión de Guiones de Subapartados")
     
@@ -1171,8 +1203,8 @@ def phase_2_page(model):
         response_subcarpetas = service.files().list(q=query_subcarpetas, spaces='drive', fields='files(id, name)').execute()
         carpetas_de_guiones_existentes = {f['name']: f['id'] for f in response_subcarpetas.get('files', [])}
 
-    # Bucle corregido para mostrar TODOS los subapartados
-    for i, matiz in enumerate(matices):
+    # Bucle final que ahora usa la lista robusta 'subapartados_a_mostrar'
+    for i, matiz in enumerate(subapartados_a_mostrar):
         subapartado_titulo = matiz.get('subapartado')
         if not subapartado_titulo:
             continue
@@ -1199,7 +1231,7 @@ def phase_2_page(model):
                     st.file_uploader(
                         "Aportar documentación de apoyo",
                         type=['pdf', 'docx', 'txt'],
-                        key=f"upload_{subapartado_titulo}", # Key única y persistente
+                        key=f"upload_{subapartado_titulo}",
                         accept_multiple_files=True,
                         label_visibility="collapsed"
                     )
@@ -1216,6 +1248,14 @@ def phase_2_page(model):
                 else:
                     if btn_container.button("Generar Borrador", key=f"gen_{i}", use_container_width=True):
                         ejecutar_generacion(subapartado_titulo, matiz)
+
+    # --- NAVEGACIÓN ---
+    st.markdown("---")
+    col_nav1, col_nav2 = st.columns(2)
+    with col_nav1:
+        st.button("← Volver a Revisión de Índice (F1)", on_click=go_to_phase1_results, use_container_width=True)
+    with col_nav2:
+        st.button("Ir a Plan de Prompts (F3) →", on_click=go_to_phase3, use_container_width=True)
 
     # --- NAVEGACIÓN ---
     st.markdown("---")
