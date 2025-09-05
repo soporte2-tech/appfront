@@ -1126,14 +1126,13 @@ def phase_2_page():
         else:
             estado = "⚪ No Generado"
             file_info = None
-            subapartado_folder_id = None # <-- NUEVA LÍNEA: Aseguramos que es None si no existe
+            subapartado_folder_id = None
 
         with st.container(border=True):
             col1, col2 = st.columns([1.5, 2])
             with col1:
                 st.write(f"**{subapartado_titulo}**")
 
-                # --- BLOQUE MODIFICADO PARA INCLUIR EL BOTÓN DE BORRAR ---
                 if estado == "📄 Generado":
                     status_col, del_col = st.columns([3, 1])
                     status_col.caption(f"Estado: {estado}")
@@ -1141,7 +1140,6 @@ def phase_2_page():
                         ejecutar_borrado(subapartado_titulo, subapartado_folder_id)
                 else:
                     st.caption(f"Estado: {estado}")
-                # --- FIN DEL BLOQUE MODIFICADO ---
 
                 if estado == "⚪ No Generado":
                     st.file_uploader("Aportar documentación de apoyo", type=['pdf', 'docx', 'txt'], key=f"upload_{subapartado_titulo}", label_visibility="collapsed")
@@ -1157,6 +1155,16 @@ def phase_2_page():
                     if btn_container.button("Generar Borrador", key=f"gen_{i}", use_container_width=True):
                         indicaciones = next((m for m in matices if m['subapartado'] == subapartado_titulo), None)
                         ejecutar_generacion(subapartado_titulo, indicaciones)
+
+    # --- AQUÍ EMPIEZA LA PARTE AÑADIDA ---
+    # (Justo después de que termine el bucle for)
+    st.markdown("---")
+    # Botones de navegación al final de la página
+    col_nav1, col_nav2 = st.columns(2)
+    with col_nav1:
+        st.button("← Volver a Revisión de Índice (F1)", on_click=go_to_phase1_results, use_container_width=True)
+    with col_nav2:
+        st.button("Ir a Plan de Prompts (F3) →", on_click=go_to_phase3, use_container_width=True)
 
 # =============================================================================
 #           NUEVA PÁGINA: FASE 3 - CENTRO DE MANDO DE PROMPTS
