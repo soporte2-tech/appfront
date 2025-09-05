@@ -1209,8 +1209,8 @@ def phase_3_page():
 
     matices = st.session_state.generated_structure.get('matices_desarrollo', [])
     
-    # --- FUNCIÓN INTERNA DE GENERACIÓN INDIVIDUAL ---
-    def handle_individual_generation(matiz_info):
+# --- FUNCIÓN INTERNA DE GENERACIÓN INDIVIDUAL (CORREGIDA) ---
+    def handle_individual_generation(matiz_info, model_obj): # <--- 1. AÑADIMOS model_obj COMO PARÁMETRO
         apartado_titulo = matiz_info.get("apartado", "N/A")
         subapartado_titulo = matiz_info.get("subapartado", "N/A")
         
@@ -1247,7 +1247,9 @@ def phase_3_page():
 
                 contenido_ia = [prompt_final] + pliegos_content_for_ia
                 generation_config = genai.GenerationConfig(response_mime_type="application/json")
-                response = model.generate_content(contenido_ia, generation_config=generation_config)
+                
+                # <--- 3. USAMOS model_obj, LA VARIABLE QUE HEMOS PASADO
+                response = model_obj.generate_content(contenido_ia, generation_config=generation_config)
                 
                 json_limpio_str = limpiar_respuesta_json(response.text)
                 if json_limpio_str:
@@ -1266,7 +1268,7 @@ def phase_3_page():
                     st.toast(f"Plan para '{subapartado_titulo}' guardado en su carpeta de Drive.")
 
             except Exception as e:
-                st.error(f"Error generando prompts para '{subapartado_titulo}': {e}")
+                st.error(f"Error generando prompts para '{subapartado_titulo}': {e}"))
     
     # --- FUNCIÓN PARA UNIFICAR PLANES ---
     def handle_conjunto_generation():
@@ -1304,7 +1306,7 @@ def phase_3_page():
             except Exception as e:
                 st.error(f"Error al generar el plan conjunto: {e}")
 
-    # --- INTERFAZ DE USUARIO ---
+    # --- INTERFAZ DE USUARIO (CORREGIDA) ---
     with st.spinner("Verificando estado de los guiones y planes..."):
         guiones_main_folder_id = find_or_create_folder(service, "Guiones de Subapartados", parent_id=project_folder_id)
         query_subcarpetas = f"'{guiones_main_folder_id}' in parents and trashed = false"
@@ -1342,15 +1344,12 @@ def phase_3_page():
             
             with col2:
                 if plan_individual_id:
-                    st.button("Re-generar Plan", key=f"gen_{i}", on_click=handle_individual_generation, args=(matiz,), use_container_width=True, type="secondary", disabled=not guion_generado)
+                    # <--- 2. PASAMOS LA VARIABLE 'model' EN LOS ARGUMENTOS
+                    st.button("Re-generar Plan", key=f"gen_{i}", on_click=handle_individual_generation, args=(matiz, model), use_container_width=True, type="secondary", disabled=not guion_generado)
                 else:
-                    st.button("Generar Plan de Prompts", key=f"gen_{i}", on_click=handle_individual_generation, args=(matiz,), use_container_width=True, type="primary", disabled=not guion_generado)
-
-    st.markdown("---")
-    st.button("🚀 Generar Plan de Prompts Conjunto", on_click=handle_conjunto_generation, use_container_width=True, type="primary", help="Unifica todos los planes individuales generados en un único archivo maestro.")
-    st.caption("La 'Redacción Final' será el siguiente paso.")
-    
-    st.button("← Volver al Centro de Mando (F2)", on_click=go_to_phase2, use_container_width=True)
+                    # <--- 2. PASAMOS LA VARIABLE 'model' EN LOS ARGUMENTOS
+                    st.button("Generar Plan de Prompts", key=f"gen_{i}", on_click=handle_individual_generation, args=(matiz, model), use_container_width=True, type="primary", disabled=not guion_generado)
+                    
 # =============================================================================
 
 #                        LÓGICA PRINCIPAL (ROUTER) - VERSIÓN CORRECTA
