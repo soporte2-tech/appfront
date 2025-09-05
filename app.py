@@ -17,6 +17,8 @@ from email.mime.text import MIMEText
 import time
 import httplib2
 import google_auth_httplib2 
+import os      # <-- AÑADE ESTA LÍNEA
+import imgkit  # <-- Y AÑADE ESTA LÍNEA TAMBIÉN
 
 # =============================================================================
 #           BLOQUE COMPLETO DE CONFIGURACIÓN Y FUNCIONES DE DRIVE
