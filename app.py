@@ -566,7 +566,6 @@ PROMPT_DESARROLLO = """
     Genera un texto profesional, bien estructurado y que responda directamente a las indicaciones. No añadas introducciones o conclusiones que no se pidan.
 """
 
----
 ### Pasos a Seguir:
 
 1.  **Reemplaza** el `PROMPT_DESARROLLO` en tu `app.py` con el código de arriba.
