@@ -1198,73 +1198,72 @@ def phase_3_page():
         else:
             st.session_state.prompt_plan = {"plan_de_prompts": []}
 
-    # --- LÓGICA DE GENERACIÓN INDIVIDUAL ---
-    def handle_individual_generation(matiz_info):
-        apartado_titulo = matiz_info.get("apartado", "N/A")
-        subapartado_titulo = matiz_info.get("subapartado", "N/A")
-        
-        with st.spinner(f"Generando prompts para: '{subapartado_titulo}'..."):
-            try:
-                # 1. RECOLECTAR CONTEXTO DE FASE 2
-                nombre_limpio = re.sub(r'[\\/*?:"<>|]', "", subapartado_titulo)
-                guiones_main_folder_id = find_or_create_folder(service, "Guiones de Subapartados", parent_id=project_folder_id)
-                subapartado_folder_id = find_file_by_name(service, nombre_limpio, guiones_main_folder_id) # OJO: find_file puede buscar carpetas si no se especifica mimeType
+def handle_individual_generation(matiz_info):
+    apartado_titulo = matiz_info.get("apartado", "N/A")
+    subapartado_titulo = matiz_info.get("subapartado", "N/A")
+    
+    with st.spinner(f"Generando prompts para: '{subapartado_titulo}'..."):
+        try:
+            # 1. RECOLECTAR CONTEXTO DE FASE 2
+            nombre_limpio = re.sub(r'[\\/*?:"<>|]', "", subapartado_titulo)
+            guiones_main_folder_id = find_or_create_folder(service, "Guiones de Subapartados", parent_id=project_folder_id)
+            # Usamos find_or_create_folder para buscar la carpeta, ya que no especificamos mimeType
+            subapartado_folder_id = find_file_by_name(service, nombre_limpio, guiones_main_folder_id) 
+            
+            contexto_adicional_str = ""
+            if subapartado_folder_id:
+                files_in_subfolder = get_files_in_project(service, subapartado_folder_id)
+                for file_info in files_in_subfolder:
+                    file_bytes = download_file_from_drive(service, file_info['id'])
+                    if file_info['name'].endswith('.docx'):
+                        doc = docx.Document(file_bytes)
+                        texto_doc = "\n".join([p.text for p in doc.paragraphs])
+                        contexto_adicional_str += f"\n--- CONTENIDO DEL GUION ({file_info['name']}) ---\n{texto_doc}\n"
+                    elif file_info['name'].endswith('.pdf'):
+                        reader = PdfReader(file_bytes)
+                        texto_pdf = "".join(page.extract_text() for page in reader.pages)
+                        contexto_adicional_str += f"\n--- CONTENIDO DEL PDF DE APOYO ({file_info['name']}) ---\n{texto_pdf}\n"
+
+            # 2. PREPARAR CONTENIDO PARA LA IA
+            pliegos_folder_id = find_or_create_folder(service, "Pliegos", parent_id=project_folder_id)
+            pliegos_files_info = get_files_in_project(service, pliegos_folder_id)
+            pliegos_content_for_ia = [{"mime_type": f['mimeType'], "data": download_file_from_drive(service, f['id']).getvalue()} for f in pliegos_files_info]
+
+            prompt_final = PROMPT_DESARROLLO.format(
+                apartado_titulo=apartado_titulo,
+                subapartado_titulo=subapartado_titulo,
+                indicaciones=matiz_info.get("indicaciones", ""),
+                contexto_adicional=contexto_adicional_str
+            )
+
+            contenido_ia = [prompt_final] + pliegos_content_for_ia
+            generation_config = genai.GenerationConfig(response_mime_type="application/json")
+            response = model.generate_content(contenido_ia, generation_config=generation_config)
+            
+            # 3. PROCESAR RESPUESTA Y ACTUALIZAR PLAN MAESTRO
+            json_limpio_str = limpiar_respuesta_json(response.text)
+            if json_limpio_str:
+                plan_parcial = json.loads(json_limpio_str)
+                nuevos_prompts = plan_parcial.get("plan_de_prompts", [])
                 
-                contexto_adicional_str = ""
-                if subapartado_folder_id:
-                    files_in_subfolder = get_files_in_project(service, subapartado_folder_id)
-                    for file_info in files_in_subfolder:
-                        file_bytes = download_file_from_drive(service, file_info['id'])
-                        if file_info['name'].endswith('.docx'):
-                            doc = docx.Document(file_bytes)
-                            texto_doc = "\n".join([p.text for p in doc.paragraphs])
-                            contexto_adicional_str += f"\n--- CONTENIDO DEL GUION ({file_info['name']}) ---\n{texto_doc}\n"
-                        elif file_info['name'].endswith('.pdf'):
-                            reader = PdfReader(file_bytes)
-                            texto_pdf = "".join(page.extract_text() for page in reader.pages)
-                            contexto_adicional_str += f"\n--- CONTENIDO DEL PDF DE APOYO ({file_info['name']}) ---\n{texto_pdf}\n"
+                prompts_actuales = st.session_state.prompt_plan['plan_de_prompts']
+                prompts_filtrados = [p for p in prompts_actuales if p.get('subapartado_referencia') != subapartado_titulo]
+                st.session_state.prompt_plan['plan_de_prompts'] = prompts_filtrados + nuevos_prompts
 
-                # 2. PREPARAR CONTENIDO PARA LA IA
-                pliegos_folder_id = find_or_create_folder(service, "Pliegos", parent_id=project_folder_id)
-                pliegos_files_info = get_files_in_project(service, pliegos_folder_id)
-                pliegos_content_for_ia = [{"mime_type": f['mimeType'], "data": download_file_from_drive(service, f['id']).getvalue()} for f in pliegos_files_info]
-
-                prompt_final = PROMPT_DESARROLLO.format(
-                    apartado_titulo=apartado_titulo,
-                    subapartado_titulo=subapartado_titulo,
-                    indicaciones=matiz_info.get("indicaciones", ""),
-                    contexto_adicional=contexto_adicional_str
-                )
-
-                contenido_ia = [prompt_final] + pliegos_content_for_ia
-                generation_config = genai.GenerationConfig(response_mime_type="application/json")
-                response = model.generate_content(contenido_ia, generation_config=generation_config)
+                # 4. GUARDAR PLAN MAESTRO ACTUALIZADO EN DRIVE
+                json_bytes = json.dumps(st.session_state.prompt_plan, indent=2, ensure_ascii=False).encode('utf-8')
+                mock_file_obj = io.BytesIO(json_bytes)
+                mock_file_obj.name = "plan_de_prompts.json"
+                mock_file_obj.type = "application/json"
                 
-                # 3. PROCESAR RESPUESTA Y ACTUALIZAR PLAN MAESTRO
-                json_limpio_str = limpiar_respuesta_json(response.text)
-                if json_limpio_str:
-                    plan_parcial = json.loads(json_limpio_str)
-                    nuevos_prompts = plan_parcial.get("plan_de_prompts", [])
-                    
-                    # Filtramos los prompts viejos para este subapartado y añadimos los nuevos
-                    prompts_actuales = st.session_state.prompt_plan['plan_de_prompts']
-                    prompts_filtrados = [p for p in prompts_actuales if p.get('subapartado_referencia') != subapartado_titulo]
-                    st.session_state.prompt_plan['plan_de_prompts'] = prompts_filtrados + nuevos_prompts
+                if prompt_plan_file_id: delete_file_from_drive(service, prompt_plan_file_id)
+                upload_file_to_drive(service, mock_file_obj, docs_app_folder_id)
+                
+                st.toast(f"Plan de prompts para '{subapartado_titulo}' generado y guardado.")
+                # La línea st.rerun() ha sido eliminada de aquí. Streamlit lo hará automáticamente.
 
-                    # 4. GUARDAR PLAN MAESTRO ACTUALIZADO EN DRIVE
-                    json_bytes = json.dumps(st.session_state.prompt_plan, indent=2, ensure_ascii=False).encode('utf-8')
-                    mock_file_obj = io.BytesIO(json_bytes)
-                    mock_file_obj.name = "plan_de_prompts.json"
-                    mock_file_obj.type = "application/json"
-                    
-                    if prompt_plan_file_id: delete_file_from_drive(service, prompt_plan_file_id)
-                    upload_file_to_drive(service, mock_file_obj, docs_app_folder_id)
-                    
-                    st.toast(f"Plan de prompts para '{subapartado_titulo}' generado y guardado.")
-                    st.rerun()
-
-            except Exception as e:
-                st.error(f"Error generando prompts para '{subapartado_titulo}': {e}")
+        except Exception as e:
+            st.error(f"Error generando prompts para '{subapartado_titulo}': {e}")
 
 
     # --- INTERFAZ DE USUARIO ---
