@@ -1116,6 +1116,8 @@ def phase_1_results_page(model):
 # =============================================================================
 #           VERSIÓN HÍBRIDA DE phase_2_page CON SELECCIÓN MÚLTIPLE Y BOTONES INDIVIDUALES
 # =============================================================================
+#           VERSIÓN FINAL Y OPTIMIZADA DE phase_2_page (CORRIGE TIMEOUT)
+# =============================================================================
 
 def phase_2_page(model):
     """Centro de mando para la generación de guiones con opciones individuales y en lote."""
@@ -1123,11 +1125,10 @@ def phase_2_page(model):
     st.markdown("Gestiona tus guiones de forma individual o selecciónalos para generarlos en lote.")
     st.markdown("---")
 
-    # --- SETUP INICIAL Y CARGA DE ÍNDICE (sin cambios) ---
+    # --- SETUP INICIAL Y CARGA DE ÍNDICE ---
     service = st.session_state.drive_service
     project_folder_id = st.session_state.selected_project['id']
     if 'generated_structure' not in st.session_state:
-        # ... (código para cargar el índice desde Drive) ...
         st.info("Sincronizando índice desde Google Drive...")
         try:
             docs_app_folder_id = find_or_create_folder(service, "Documentos aplicación", parent_id=project_folder_id)
@@ -1135,7 +1136,7 @@ def phase_2_page(model):
             if saved_index_id:
                 index_content_bytes = download_file_from_drive(service, saved_index_id)
                 st.session_state.generated_structure = json.loads(index_content_bytes.getvalue().decode('utf-8'))
-                st.rerun() 
+                st.rerun()
             else:
                 st.warning("No se ha encontrado un índice guardado. Por favor, vuelve a la Fase 1 para generar uno.")
                 if st.button("← Ir a Fase 1"): go_to_phase1(); st.rerun()
@@ -1144,7 +1145,7 @@ def phase_2_page(model):
             st.error(f"Error al cargar el índice desde Drive: {e}")
             return
 
-    # --- CONSTRUCCIÓN DE LISTA ROBUSTA (sin cambios) ---
+    # --- CONSTRUCCIÓN DE LISTA ROBUSTA ---
     estructura = st.session_state.generated_structure.get('estructura_memoria', [])
     matices_originales = st.session_state.generated_structure.get('matices_desarrollo', [])
     matices_dict = {item.get('subapartado', ''): item for item in matices_originales if isinstance(item, dict) and 'subapartado' in item}
@@ -1155,16 +1156,14 @@ def phase_2_page(model):
         for subapartado_titulo in seccion.get('subapartados', []):
             matiz_existente = matices_dict.get(subapartado_titulo)
             if matiz_existente: subapartados_a_mostrar.append(matiz_existente)
-            else: subapartados_a_mostrar.append({"apartado": apartado_principal, "subapartado": subapartado_titulo, "indicaciones": "N/A"})
+            else: subapartados_a_mostrar.append({"apartado": apartado_principal, "subapartado": subapartado_titulo, "indicaciones": "No se encontraron indicaciones detalladas."})
     if not subapartados_a_mostrar: st.warning("El índice no contiene subapartados."); return
 
-    # --- FUNCIONES DE ACCIÓN (sin cambios) ---
-    # (Las funciones ejecutar_generacion, ejecutar_regeneracion y ejecutar_borrado permanecen aquí sin cambios)
+    # --- FUNCIONES DE ACCIÓN INTERNAS ---
     def ejecutar_generacion(titulo, indicaciones_completas, show_toast=True):
         nombre_limpio = re.sub(r'[\\/*?:"<>|]', "", titulo)
         nombre_archivo = nombre_limpio + ".docx"
         try:
-            # ... (código interno de la función sin cambios) ...
             guiones_folder_id = find_or_create_folder(service, "Guiones de Subapartados", parent_id=project_folder_id)
             subapartado_guion_folder_id = find_or_create_folder(service, nombre_limpio, parent_id=guiones_folder_id)
             pliegos_folder_id = find_or_create_folder(service, "Pliegos", parent_id=project_folder_id)
@@ -1191,51 +1190,47 @@ def phase_2_page(model):
             upload_file_to_drive(service, word_file_obj, subapartado_guion_folder_id)
             if show_toast: st.toast(f"Borrador para '{titulo}' generado y guardado.")
             return True
-        except Exception as e:
-            st.error(f"Error al generar '{titulo}': {e}")
-            return False
+        except Exception as e: st.error(f"Error al generar '{titulo}': {e}"); return False
 
-    def ejecutar_regeneracion(titulo, file_id_borrador):
-        # ... (código idéntico) ...
-        pass
-    def ejecutar_borrado(titulo, folder_id_to_delete):
-        # ... (código idéntico) ...
-        pass
+    def ejecutar_regeneracion(titulo, file_id_borrador): pass # Tu código original aquí
+    def ejecutar_borrado(titulo, folder_id_to_delete): pass # Tu código original aquí
 
     # =============================================================================
-    #           NUEVA SECCIÓN SUPERIOR PARA ACCIONES EN LOTE
+    #           OPTIMIZACIÓN CLAVE: OBTENER DATOS DE DRIVE UNA SOLA VEZ
+    # =============================================================================
+    with st.spinner("Sincronizando con Google Drive..."):
+        guiones_folder_id = find_or_create_folder(service, "Guiones de Subapartados", parent_id=project_folder_id)
+        # Hacemos UNA sola llamada a la API para obtener todas las carpetas existentes
+        carpetas_existentes_response = get_files_in_project(service, guiones_folder_id)
+        carpetas_de_guiones_existentes = {f['name']: f['id'] for f in carpetas_existentes_response if f['mimeType'] == 'application/vnd.google-apps.folder'}
+        nombres_carpetas_existentes = set(carpetas_de_guiones_existentes.keys())
+
+    # =============================================================================
+    #           SECCIÓN SUPERIOR PARA ACCIONES EN LOTE (AHORA OPTIMIZADA)
     # =============================================================================
     st.subheader("Generación de Borradores en Lote")
     
-    # Obtenemos la lista de claves para los checkboxes de los elementos pendientes
-    pending_keys = [matiz.get('subapartado') for matiz in subapartados_a_mostrar if not any(re.sub(r'[\\/*?:"<>|]', "", matiz.get('subapartado')) == f['name'] for f in get_files_in_project(service, find_or_create_folder(service, "Guiones de Subapartados", parent_id=project_folder_id)))]
+    pending_keys = [matiz.get('subapartado') for matiz in subapartados_a_mostrar if re.sub(r'[\\/*?:"<>|]', "", matiz.get('subapartado')) not in nombres_carpetas_existentes]
     
-    # Función para el checkbox "Seleccionar Todos"
     def toggle_all_checkboxes():
         new_state = st.session_state.select_all_checkbox
-        for key in pending_keys:
-            st.session_state[f"cb_{key}"] = new_state
+        for key in pending_keys: st.session_state[f"cb_{key}"] = new_state
 
     with st.container(border=True):
         col_sel_1, col_sel_2 = st.columns([1, 2])
-        
         with col_sel_1:
             st.checkbox("Seleccionar Todos / Ninguno", key="select_all_checkbox", on_change=toggle_all_checkboxes, disabled=not pending_keys)
-
         with col_sel_2:
             selected_keys = [key for key in pending_keys if st.session_state.get(f"cb_{key}")]
             num_selected = len(selected_keys)
-            
             if st.button(f"🚀 Generar {num_selected} borradores seleccionados", type="primary", use_container_width=True, disabled=(num_selected == 0)):
                 progress_bar = st.progress(0, text="Iniciando generación en lote...")
                 items_to_generate = [matiz for matiz in subapartados_a_mostrar if matiz.get('subapartado') in selected_keys]
-                
                 for i, matiz_a_generar in enumerate(items_to_generate):
                     titulo = matiz_a_generar.get('subapartado')
                     progress_text = f"Generando ({i+1}/{num_selected}): {titulo}"
                     progress_bar.progress((i + 1) / num_selected, text=progress_text)
                     ejecutar_generacion(titulo, matiz_a_generar, show_toast=False)
-
                 progress_bar.progress(1.0, text="¡Generación en lote completada!")
                 st.success(f"{num_selected} borradores generados.")
                 st.balloons()
@@ -1244,19 +1239,15 @@ def phase_2_page(model):
     st.markdown("---")
     st.subheader("Gestión de Guiones de Subapartados")
 
-    with st.spinner("Sincronizando con Google Drive..."):
-        guiones_folder_id = find_or_create_folder(service, "Guiones de Subapartados", parent_id=project_folder_id)
-        carpetas_de_guiones_existentes = {f['name']: f['id'] for f in get_files_in_project(service, guiones_folder_id) if f['mimeType'] == 'application/vnd.google-apps.folder'}
-
     # =============================================================================
-    #           INTERFAZ DE GESTIÓN DE GUIONES (DISEÑO ORIGINAL RESTAURADO + CHECKBOX)
+    #           INTERFAZ DE GESTIÓN DE GUIONES (DISEÑO HÍBRIDO Y OPTIMIZADO)
     # =============================================================================
     for i, matiz in enumerate(subapartados_a_mostrar):
         subapartado_titulo = matiz.get('subapartado')
         if not subapartado_titulo: continue
         nombre_limpio = re.sub(r'[\\/*?:"<>|]', "", subapartado_titulo)
         
-        if nombre_limpio in carpetas_de_guiones_existentes:
+        if nombre_limpio in nombres_carpetas_existentes:
             estado = "📄 Generado"
             subapartado_folder_id = carpetas_de_guiones_existentes[nombre_limpio]
             files_in_subfolder = get_files_in_project(service, subapartado_folder_id)
@@ -1268,19 +1259,12 @@ def phase_2_page(model):
         with st.container(border=True):
             col1, col2 = st.columns([2, 1])
             with col1:
-                # Si no está generado, el título es un checkbox. Si ya está, es solo texto.
-                if estado == "⚪ No Generado":
-                    st.checkbox(f"**{subapartado_titulo}**", key=f"cb_{subapartado_titulo}")
-                else:
-                    st.write(f"**{subapartado_titulo}**")
-                
+                if estado == "⚪ No Generado": st.checkbox(f"**{subapartado_titulo}**", key=f"cb_{subapartado_titulo}")
+                else: st.write(f"**{subapartado_titulo}**")
                 st.caption(f"Estado: {estado}")
-
                 if estado == "⚪ No Generado":
                     st.file_uploader("Aportar documentación de apoyo", type=['pdf', 'docx', 'txt'], key=f"upload_{subapartado_titulo}", accept_multiple_files=True, label_visibility="collapsed")
-            
             with col2:
-                # Lógica de botones restaurada a la original
                 if estado == "📄 Generado" and file_info:
                     link = f"https://docs.google.com/document/d/{file_info['id']}/edit"
                     st.link_button("Revisar en Drive", link, use_container_width=True)
@@ -1289,20 +1273,17 @@ def phase_2_page(model):
                     if st.button("🗑️ Borrar", key=f"del_{i}", use_container_width=True):
                          ejecutar_borrado(subapartado_titulo, subapartado_folder_id)
                 else:
-                    # RESTAURAMOS EL BOTÓN DE GENERACIÓN INDIVIDUAL
                     if st.button("Generar Borrador", key=f"gen_{i}", use_container_width=True):
                         with st.spinner(f"Generando borrador para '{subapartado_titulo}'..."):
-                            if ejecutar_generacion(subapartado_titulo, matiz):
-                                st.rerun()
+                            if ejecutar_generacion(subapartado_titulo, matiz): st.rerun()
 
-    # --- NAVEGACIÓN (sin cambios) ---
+    # --- NAVEGACIÓN ---
     st.markdown("---")
     col_nav1, col_nav2 = st.columns(2)
     with col_nav1:
         st.button("← Volver a Revisión de Índice (F1)", on_click=go_to_phase1_results, use_container_width=True)
     with col_nav2:
         st.button("Ir a Plan de Prompts (F3) →", on_click=go_to_phase3, use_container_width=True)
-# =============================================================================
 #           REEMPLAZA TU phase_3_page ACTUAL POR ESTA VERSIÓN DEFINITIVA
 # =============================================================================
 
