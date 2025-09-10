@@ -985,10 +985,14 @@ def phase_1_page(model):
 #           REEMPLAZA phase_1_results_page POR ESTA VERSIÓN COMPLETA
 # =============================================================================
 
+# =============================================================================
+#           VERSIÓN FINAL Y COMPLETA DE phase_1_results_page() CON SINCRONIZACIÓN
+# =============================================================================
+
 def phase_1_results_page(model):
-    """Página para revisar, regenerar y ACEPTAR el índice para pasar a Fase 2."""
+    """Página para revisar, regenerar, ACEPTAR el índice y SINCRONIZAR carpetas."""
     st.markdown("<h3>FASE 1: Revisión de Resultados</h3>", unsafe_allow_html=True)
-    st.markdown("Revisa y ajusta el índice hasta que sea perfecto. Cuando esté listo, pasa a la siguiente fase para generar el contenido de cada apartado.")
+    st.markdown("Revisa y ajusta el índice. Al aceptarlo, se limpiarán las carpetas de guiones antiguas y se guardará la nueva estructura.")
     st.markdown("---")
     st.button("← Volver a la gestión de archivos", on_click=go_to_phase1)
 
@@ -996,7 +1000,7 @@ def phase_1_results_page(model):
         st.warning("No se ha generado ninguna estructura.")
         return
 
-    # --- FUNCIÓN INTERNA COMPLETA ---
+    # --- FUNCIÓN INTERNA DE REGENERACIÓN (sin cambios) ---
     def handle_regeneration():
         feedback_text = st.session_state.feedback_area
         if not feedback_text:
@@ -1005,6 +1009,7 @@ def phase_1_results_page(model):
 
         with st.spinner("🧠 Incorporando tu feedback y regenerando la estructura..."):
             try:
+                # ... (El código de esta función interna permanece igual) ...
                 contenido_ia_regeneracion = [PROMPT_REGENERACION]
                 contenido_ia_regeneracion.append("--- INSTRUCCIONES DEL USUARIO ---\n" + feedback_text)
                 contenido_ia_regeneracion.append("--- ESTRUCTURA JSON ANTERIOR A CORREGIR ---\n" + json.dumps(st.session_state.generated_structure, indent=2))
@@ -1031,35 +1036,35 @@ def phase_1_results_page(model):
                     st.error("La IA no devolvió una estructura válida tras la regeneración.")
             except Exception as e:
                 st.error(f"Ocurrió un error durante la regeneración: {e}")
-    # --- FIN DE LA FUNCIÓN INTERNA ---
 
+    # --- Contenido principal de la página ---
     with st.container(border=True):
         mostrar_indice_desplegable(st.session_state.generated_structure.get('estructura_memoria'))
         st.markdown("---")
         st.subheader("Validación y Siguiente Paso")
         
-        st.text_area("Si necesitas cambios, indícalos aquí:", key="feedback_area", placeholder="Ej: 'Añade un subapartado 1.3 sobre riesgos.'")
+        st.text_area("Si necesitas cambios, indícalos aquí:", key="feedback_area", placeholder="Ej: 'Une los apartados 1.1 y 1.2 en uno solo.'")
         
+        # AQUÍ SE CREAN LAS COLUMNAS DENTRO DE LA FUNCIÓN
         col_val_1, col_val_2 = st.columns(2)
+        
         with col_val_1:
             st.button("Regenerar con Feedback", on_click=handle_regeneration, use_container_width=True, disabled=not st.session_state.get("feedback_area"))
 
-with col_val_2:
+        # --- INICIO DEL BLOQUE CORREGIDO Y EN SU LUGAR CORRECTO ---
+        with col_val_2:
             if st.button("Aceptar Índice y Pasar a Fase 2 →", type="primary", use_container_width=True):
-                # Actualizamos el mensaje del spinner para que sea más informativo
                 with st.spinner("Sincronizando carpetas y guardando índice final en Drive..."):
                     try:
                         service = st.session_state.drive_service
                         project_folder_id = st.session_state.selected_project['id']
                         
-                        # --- ¡AQUÍ ESTÁ LA MAGIA! ---
-                        # Llamamos a nuestra nueva función de sincronización ANTES de guardar el nuevo índice.
+                        # Llamamos a la función de sincronización que creaste
                         deleted_count = sync_guiones_folders_with_index(service, project_folder_id, st.session_state.generated_structure)
                         if deleted_count > 0:
                             st.success(f"Limpieza completada: {deleted_count} carpetas de guiones obsoletas eliminadas.")
-                        # --- FIN DE LA NUEVA LÓGICA ---
 
-                        # Ahora continúa la lógica original para guardar el nuevo índice
+                        # Lógica original para guardar el nuevo índice
                         docs_app_folder_id = find_or_create_folder(service, "Documentos aplicación", parent_id=project_folder_id)
 
                         indice_final = st.session_state.generated_structure
@@ -1078,8 +1083,8 @@ with col_val_2:
                         st.rerun()
 
                     except Exception as e:
-                        # Hemos mejorado el mensaje de error para que sea más específico
                         st.error(f"Ocurrió un error durante la sincronización o guardado: {e}")
+        # --- FIN DEL BLOQUE CORREGIDO ---
 
 # =============================================================================
 #           REEMPLAZA TU phase_2_page ACTUAL POR ESTA VERSIÓN DEFINITIVA
