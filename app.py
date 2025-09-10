@@ -1090,6 +1090,10 @@ def phase_1_results_page(model):
 #           REEMPLAZA TU phase_2_page ACTUAL POR ESTA VERSIÓN DEFINITIVA
 # =============================================================================
 
+# =============================================================================
+#           REEMPLAZA TU phase_2_page ACTUAL POR ESTA VERSIÓN DEFINITIVA
+# =============================================================================
+
 def phase_2_page(model):
     """Centro de mando para la generación y re-generación de guiones con documentación de apoyo."""
     st.markdown("<h3>FASE 2: Centro de Mando de Guiones</h3>", unsafe_allow_html=True)
@@ -1118,21 +1122,28 @@ def phase_2_page(model):
             return
 
     # =============================================================================
-    #           INICIO DEL CAMBIO CLAVE: CONSTRUCCIÓN DE LISTA A PRUEBA DE FALLOS
+    #           INICIO DEL BLOQUE CORREGIDO: CONSTRUCCIÓN DE LISTA A PRUEBA DE FALLOS
     # =============================================================================
     
     estructura = st.session_state.generated_structure.get('estructura_memoria', [])
     matices_originales = st.session_state.generated_structure.get('matices_desarrollo', [])
     
-    # Creamos un diccionario para buscar matices fácilmente por el título del subapartado
-    matices_dict = {item.get('subapartado', ''): item for item in matices_originales}
+    # --- INICIO DE LA CORRECCIÓN ---
+    # Creamos un diccionario para buscar matices, PERO solo si el item es un diccionario válido.
+    # Esto evita el AttributeError si la lista contiene strings u otros tipos.
+    matices_dict = {
+        item.get('subapartado', ''): item 
+        for item in matices_originales 
+        if isinstance(item, dict) and 'subapartado' in item
+    }
+    # --- FIN DE LA CORRECCIÓN ---
     
     # Construimos nuestra propia lista completa y robusta
-    subapartados_a_mostrar = []
     if not estructura:
         st.error("La estructura JSON no contiene la clave 'estructura_memoria'. Vuelve a generar el índice.")
         return
 
+    subapartados_a_mostrar = []
     for seccion in estructura:
         apartado_principal = seccion.get('apartado', 'Sin Título')
         for subapartado_titulo in seccion.get('subapartados', []):
@@ -1155,7 +1166,7 @@ def phase_2_page(model):
         return
         
     # =============================================================================
-    #           FIN DEL CAMBIO CLAVE. AHORA USAMOS 'subapartados_a_mostrar'
+    #           FIN DEL BLOQUE CORREGIDO. AHORA USAMOS 'subapartados_a_mostrar'
     # =============================================================================
 
 
@@ -1317,7 +1328,10 @@ def phase_2_page(model):
         st.button("← Volver a Revisión de Índice (F1)", on_click=go_to_phase1_results, use_container_width=True)
     with col_nav2:
         st.button("Ir a Plan de Prompts (F3) →", on_click=go_to_phase3, use_container_width=True)
-        
+# =============================================================================
+#           REEMPLAZA TU phase_3_page ACTUAL POR ESTA VERSIÓN DEFINITIVA
+# =============================================================================
+
 # =============================================================================
 #           REEMPLAZA TU phase_3_page ACTUAL POR ESTA VERSIÓN DEFINITIVA
 # =============================================================================
@@ -1346,19 +1360,26 @@ def phase_3_page(model):
             return
 
     # =============================================================================
-    #           INICIO DE LA CORRECCIÓN: CONSTRUCCIÓN DE LISTA A PRUEBA DE FALLOS
+    #           INICIO DEL BLOQUE CORREGIDO: CONSTRUCCIÓN DE LISTA A PRUEBA DE FALLOS
     # =============================================================================
     
     estructura = st.session_state.generated_structure.get('estructura_memoria', [])
     matices_originales = st.session_state.generated_structure.get('matices_desarrollo', [])
     
-    matices_dict = {item.get('subapartado', ''): item for item in matices_originales}
+    # --- INICIO DE LA CORRECCIÓN ---
+    # Creamos un diccionario para buscar matices, PERO solo si el item es un diccionario válido.
+    matices_dict = {
+        item.get('subapartado', ''): item 
+        for item in matices_originales 
+        if isinstance(item, dict) and 'subapartado' in item
+    }
+    # --- FIN DE LA CORRECCIÓN ---
     
-    subapartados_a_mostrar = []
     if not estructura:
         st.error("La estructura JSON no contiene la clave 'estructura_memoria'. Vuelve a generar el índice.")
         return
 
+    subapartados_a_mostrar = []
     for seccion in estructura:
         apartado_principal = seccion.get('apartado', 'Sin Título')
         for subapartado_titulo in seccion.get('subapartados', []):
@@ -1377,7 +1398,7 @@ def phase_3_page(model):
         return
 
     # =============================================================================
-    #           FIN DE LA CORRECCIÓN. AHORA USAMOS 'subapartados_a_mostrar'
+    #           FIN DEL BLOQUE CORREGIDO. AHORA USAMOS 'subapartados_a_mostrar'
     # =============================================================================
     
     # --- FUNCIÓN INTERNA DE GENERACIÓN INDIVIDUAL ---
@@ -1415,7 +1436,6 @@ def phase_3_page(model):
                 )
 
                 contenido_ia = [prompt_final] + pliegos_content_for_ia
-                # Añadir contexto adicional si existe
                 if contexto_adicional_str:
                     contenido_ia.append("--- CONTEXTO ADICIONAL DE GUIONES Y DOCUMENTACIÓN DE APOYO ---\n" + contexto_adicional_str)
 
