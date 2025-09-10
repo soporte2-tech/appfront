@@ -1291,13 +1291,17 @@ def phase_2_page(model):
 #           REEMPLAZA TU phase_3_page ACTUAL POR ESTA VERSIÓN DEFINITIVA
 # =============================================================================
 
+# =============================================================================
+#           VERSIÓN FINAL Y OPTIMIZADA DE phase_3_page (CON SELECCIÓN MÚLTIPLE)
+# =============================================================================
+
 def phase_3_page(model):
     """Página interactiva para generar, descargar y unificar planes de prompts."""
     st.markdown("<h3>FASE 3: Centro de Mando de Prompts</h3>", unsafe_allow_html=True)
-    st.markdown("Genera planes de prompts individuales para los apartados que necesites. Cuando termines, unifícalos en un solo plan maestro para la redacción final.")
+    st.markdown("Genera planes de prompts de forma individual o selecciónalos para procesarlos en lote.")
     st.markdown("---")
 
-    # --- SETUP ROBUSTO ---
+    # --- SETUP INICIAL Y CARGA DE ÍNDICE ---
     service = st.session_state.drive_service
     project_folder_id = st.session_state.selected_project['id']
     docs_app_folder_id = find_or_create_folder(service, "Documentos aplicación", parent_id=project_folder_id)
@@ -1314,197 +1318,161 @@ def phase_3_page(model):
             if st.button("← Ir a Fase 1"): go_to_phase1(); st.rerun()
             return
 
-    # =============================================================================
-    #           INICIO DEL BLOQUE CORREGIDO: CONSTRUCCIÓN DE LISTA A PRUEBA DE FALLOS
-    # =============================================================================
-    
+    # --- CONSTRUCCIÓN DE LISTA ROBUSTA ---
     estructura = st.session_state.generated_structure.get('estructura_memoria', [])
     matices_originales = st.session_state.generated_structure.get('matices_desarrollo', [])
-    
-    # --- INICIO DE LA CORRECCIÓN ---
-    # Creamos un diccionario para buscar matices, PERO solo si el item es un diccionario válido.
-    matices_dict = {
-        item.get('subapartado', ''): item 
-        for item in matices_originales 
-        if isinstance(item, dict) and 'subapartado' in item
-    }
-    # --- FIN DE LA CORRECCIÓN ---
-    
-    if not estructura:
-        st.error("La estructura JSON no contiene la clave 'estructura_memoria'. Vuelve a generar el índice.")
-        return
-
+    matices_dict = {item.get('subapartado', ''): item for item in matices_originales if isinstance(item, dict) and 'subapartado' in item}
+    if not estructura: st.error("La estructura JSON no contiene la clave 'estructura_memoria'."); return
     subapartados_a_mostrar = []
     for seccion in estructura:
         apartado_principal = seccion.get('apartado', 'Sin Título')
         for subapartado_titulo in seccion.get('subapartados', []):
             matiz_existente = matices_dict.get(subapartado_titulo)
-            if matiz_existente:
-                subapartados_a_mostrar.append(matiz_existente)
-            else:
-                subapartados_a_mostrar.append({
-                    "apartado": apartado_principal,
-                    "subapartado": subapartado_titulo,
-                    "indicaciones": "No se encontraron indicaciones detalladas para este apartado en el JSON."
-                })
+            if matiz_existente: subapartados_a_mostrar.append(matiz_existente)
+            else: subapartados_a_mostrar.append({"apartado": apartado_principal, "subapartado": subapartado_titulo, "indicaciones": "No se encontraron indicaciones detalladas."})
+    if not subapartados_a_mostrar: st.warning("El índice no contiene subapartados."); return
 
-    if not subapartados_a_mostrar:
-        st.warning("El índice no parece contener ningún subapartado para gestionar.")
-        return
+    # --- FUNCIONES DE ACCIÓN INTERNAS ---
+    def handle_individual_generation(matiz_info, callback_model, show_toast=True):
+        apartado_titulo = matiz_info.get("apartado", "N/A"); subapartado_titulo = matiz_info.get("subapartado", "N/A")
+        try:
+            guiones_main_folder_id = find_or_create_folder(service, "Guiones de Subapartados", parent_id=project_folder_id)
+            nombre_limpio = re.sub(r'[\\/*?:"<>|]', "", subapartado_titulo)
+            subapartado_folder_id = find_or_create_folder(service, nombre_limpio, parent_id=guiones_main_folder_id)
+            contexto_adicional_str = ""; files_in_subfolder = get_files_in_project(service, subapartado_folder_id)
+            for file_info in files_in_subfolder:
+                file_bytes = download_file_from_drive(service, file_info['id'])
+                if file_info['name'].endswith('.docx'):
+                    doc = docx.Document(io.BytesIO(file_bytes.getvalue())); texto_doc = "\n".join([p.text for p in doc.paragraphs])
+                    contexto_adicional_str += f"\n--- CONTENIDO DEL GUION ({file_info['name']}) ---\n{texto_doc}\n"
+                elif file_info['name'].endswith('.pdf'):
+                    reader = PdfReader(io.BytesIO(file_bytes.getvalue())); texto_pdf = "".join(page.extract_text() for page in reader.pages)
+                    contexto_adicional_str += f"\n--- CONTENIDO DEL PDF DE APOYO ({file_info['name']}) ---\n{texto_pdf}\n"
+            pliegos_folder_id = find_or_create_folder(service, "Pliegos", parent_id=project_folder_id)
+            pliegos_files_info = get_files_in_project(service, pliegos_folder_id)
+            pliegos_content_for_ia = [{"mime_type": f['mimeType'], "data": download_file_from_drive(service, f['id']).getvalue()} for f in pliegos_files_info]
+            prompt_final = PROMPT_DESARROLLO.format(apartado_titulo=apartado_titulo, subapartado_titulo=subapartado_titulo, indicaciones=matiz_info.get("indicaciones", ""))
+            contenido_ia = [prompt_final] + pliegos_content_for_ia
+            if contexto_adicional_str: contenido_ia.append("--- CONTEXTO ADICIONAL DE GUIONES Y DOCUMENTACIÓN DE APOYO ---\n" + contexto_adicional_str)
+            generation_config = genai.GenerationConfig(response_mime_type="application/json")
+            response = callback_model.generate_content(contenido_ia, generation_config=generation_config)
+            json_limpio_str = limpiar_respuesta_json(response.text)
+            if json_limpio_str:
+                plan_parcial_obj = json.loads(json_limpio_str)
+                json_bytes = json.dumps(plan_parcial_obj, indent=2, ensure_ascii=False).encode('utf-8')
+                mock_file_obj = io.BytesIO(json_bytes); mock_file_obj.name = "prompts_individual.json"; mock_file_obj.type = "application/json"
+                old_plan_id = find_file_by_name(service, "prompts_individual.json", subapartado_folder_id)
+                if old_plan_id: delete_file_from_drive(service, old_plan_id)
+                upload_file_to_drive(service, mock_file_obj, subapartado_folder_id)
+                if show_toast: st.toast(f"Plan para '{subapartado_titulo}' guardado en su carpeta de Drive.")
+                return True
+        except Exception as e: st.error(f"Error generando prompts para '{subapartado_titulo}': {e}"); return False
 
-    # =============================================================================
-    #           FIN DEL BLOQUE CORREGIDO. AHORA USAMOS 'subapartados_a_mostrar'
-    # =============================================================================
-    
-    # --- FUNCIÓN INTERNA DE GENERACIÓN INDIVIDUAL ---
-    def handle_individual_generation(matiz_info, callback_model):
-        apartado_titulo = matiz_info.get("apartado", "N/A")
-        subapartado_titulo = matiz_info.get("subapartado", "N/A")
-        
-        with st.spinner(f"Generando y guardando plan para: '{subapartado_titulo}'..."):
-            try:
-                guiones_main_folder_id = find_or_create_folder(service, "Guiones de Subapartados", parent_id=project_folder_id)
-                nombre_limpio = re.sub(r'[\\/*?:"<>|]', "", subapartado_titulo)
-                subapartado_folder_id = find_or_create_folder(service, nombre_limpio, parent_id=guiones_main_folder_id)
-                
-                contexto_adicional_str = ""
-                files_in_subfolder = get_files_in_project(service, subapartado_folder_id)
-                for file_info in files_in_subfolder:
-                    file_bytes = download_file_from_drive(service, file_info['id'])
-                    if file_info['name'].endswith('.docx'):
-                        doc = docx.Document(io.BytesIO(file_bytes.getvalue()))
-                        texto_doc = "\n".join([p.text for p in doc.paragraphs])
-                        contexto_adicional_str += f"\n--- CONTENIDO DEL GUION ({file_info['name']}) ---\n{texto_doc}\n"
-                    elif file_info['name'].endswith('.pdf'):
-                        reader = PdfReader(io.BytesIO(file_bytes.getvalue()))
-                        texto_pdf = "".join(page.extract_text() for page in reader.pages)
-                        contexto_adicional_str += f"\n--- CONTENIDO DEL PDF DE APOYO ({file_info['name']}) ---\n{texto_pdf}\n"
-
-                pliegos_folder_id = find_or_create_folder(service, "Pliegos", parent_id=project_folder_id)
-                pliegos_files_info = get_files_in_project(service, pliegos_folder_id)
-                pliegos_content_for_ia = [{"mime_type": f['mimeType'], "data": download_file_from_drive(service, f['id']).getvalue()} for f in pliegos_files_info]
-
-                prompt_final = PROMPT_DESARROLLO.format(
-                    apartado_titulo=apartado_titulo,
-                    subapartado_titulo=subapartado_titulo,
-                    indicaciones=matiz_info.get("indicaciones", ""),
-                )
-
-                contenido_ia = [prompt_final] + pliegos_content_for_ia
-                if contexto_adicional_str:
-                    contenido_ia.append("--- CONTEXTO ADICIONAL DE GUIONES Y DOCUMENTACIÓN DE APOYO ---\n" + contexto_adicional_str)
-
-                generation_config = genai.GenerationConfig(response_mime_type="application/json")
-                response = callback_model.generate_content(contenido_ia, generation_config=generation_config)
-                
-                json_limpio_str = limpiar_respuesta_json(response.text)
-                if json_limpio_str:
-                    plan_parcial_obj = json.loads(json_limpio_str)
-                    json_bytes = json.dumps(plan_parcial_obj, indent=2, ensure_ascii=False).encode('utf-8')
-                    mock_file_obj = io.BytesIO(json_bytes)
-                    mock_file_obj.name = "prompts_individual.json"
-                    mock_file_obj.type = "application/json"
-                    
-                    old_plan_id = find_file_by_name(service, "prompts_individual.json", subapartado_folder_id)
-                    if old_plan_id:
-                        delete_file_from_drive(service, old_plan_id)
-                    upload_file_to_drive(service, mock_file_obj, subapartado_folder_id)
-                    st.toast(f"Plan para '{subapartado_titulo}' guardado en su carpeta de Drive.")
-                    st.rerun()
-
-            except Exception as e:
-                st.error(f"Error generando prompts para '{subapartado_titulo}': {e}")
-    
     def handle_conjunto_generation():
         with st.spinner("Buscando y unificando todos los planes de prompts individuales..."):
             try:
                 all_prompts = []
                 guiones_main_folder_id = find_or_create_folder(service, "Guiones de Subapartados", parent_id=project_folder_id)
-                query_subcarpetas = f"'{guiones_main_folder_id}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false"
-                response_subcarpetas = service.files().list(q=query_subcarpetas, spaces='drive', fields='files(id, name)').execute()
-                
+                response_subcarpetas = service.files().list(q=f"'{guiones_main_folder_id}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false", spaces='drive', fields='files(id, name)').execute()
                 for subfolder in response_subcarpetas.get('files', []):
                     individual_plan_id = find_file_by_name(service, "prompts_individual.json", subfolder['id'])
                     if individual_plan_id:
                         json_bytes = download_file_from_drive(service, individual_plan_id).getvalue()
                         individual_plan_obj = json.loads(json_bytes.decode('utf-8'))
                         all_prompts.extend(individual_plan_obj.get("plan_de_prompts", []))
-                
-                if not all_prompts:
-                    st.warning("No se encontraron planes individuales para unificar. Genera al menos uno.")
-                    return
-
+                if not all_prompts: st.warning("No se encontraron planes individuales para unificar. Genera al menos uno."); return
                 all_prompts.sort(key=lambda x: x.get('prompt_id', ''))
-
                 final_json_object = {"plan_de_prompts": all_prompts}
                 json_bytes_conjunto = json.dumps(final_json_object, indent=2, ensure_ascii=False).encode('utf-8')
-                mock_file_obj = io.BytesIO(json_bytes_conjunto)
-                mock_file_obj.name = "plan_de_prompts_conjunto.json"
-                mock_file_obj.type = "application/json"
-                
+                mock_file_obj = io.BytesIO(json_bytes_conjunto); mock_file_obj.name = "plan_de_prompts_conjunto.json"; mock_file_obj.type = "application/json"
                 old_conjunto_id = find_file_by_name(service, "plan_de_prompts_conjunto.json", docs_app_folder_id)
-                if old_conjunto_id:
-                    delete_file_from_drive(service, old_conjunto_id)
-                
+                if old_conjunto_id: delete_file_from_drive(service, old_conjunto_id)
                 upload_file_to_drive(service, mock_file_obj, docs_app_folder_id)
                 st.success(f"¡Plan conjunto generado y ORDENADO con {len(all_prompts)} prompts y guardado en Drive!")
+            except Exception as e: st.error(f"Error al generar el plan conjunto: {e}")
 
-            except Exception as e:
-                st.error(f"Error al generar el plan conjunto: {e}")
-
-    # --- INTERFAZ DE USUARIO ---
-    with st.spinner("Verificando estado de los guiones y planes..."):
+    # =============================================================================
+    #           OPTIMIZACIÓN CLAVE: OBTENER ESTADO DE PLANES UNA SOLA VEZ
+    # =============================================================================
+    with st.spinner("Verificando estado de los planes de prompts..."):
         guiones_main_folder_id = find_or_create_folder(service, "Guiones de Subapartados", parent_id=project_folder_id)
-        query_subcarpetas = f"'{guiones_main_folder_id}' in parents and trashed = false"
-        response_subcarpetas = service.files().list(q=query_subcarpetas, spaces='drive', fields='files(id, name)').execute()
-        carpetas_con_info = {f['name']: f['id'] for f in response_subcarpetas.get('files', [])}
-        
+        carpetas_de_guiones = list_project_folders(service, guiones_main_folder_id)
         planes_individuales_existentes = {}
-        for nombre, folder_id in carpetas_con_info.items():
+        for nombre_carpeta, folder_id in carpetas_de_guiones.items():
             plan_id = find_file_by_name(service, "prompts_individual.json", folder_id)
-            if plan_id:
-                planes_individuales_existentes[nombre] = plan_id
+            if plan_id: planes_individuales_existentes[nombre_carpeta] = plan_id
 
-    # Bucle que ahora usa la lista robusta 'subapartados_a_mostrar'
+    # =============================================================================
+    #           SECCIÓN SUPERIOR PARA ACCIONES EN LOTE
+    # =============================================================================
+    st.subheader("Generación de Planes de Prompts en Lote")
+    pending_keys = [matiz.get('subapartado') for matiz in subapartados_a_mostrar if re.sub(r'[\\/*?:"<>|]', "", matiz.get('subapartado')) in carpetas_de_guiones and re.sub(r'[\\/*?:"<>|]', "", matiz.get('subapartado')) not in planes_individuales_existentes]
+    
+    def toggle_all_prompt_checkboxes():
+        new_state = st.session_state.select_all_prompts_checkbox
+        for key in pending_keys: st.session_state[f"pcb_{key}"] = new_state
+
+    with st.container(border=True):
+        col_sel_1, col_sel_2 = st.columns([1, 2])
+        with col_sel_1:
+            st.checkbox("Seleccionar Todos / Ninguno", key="select_all_prompts_checkbox", on_change=toggle_all_prompt_checkboxes, disabled=not pending_keys)
+        with col_sel_2:
+            selected_keys = [key for key in pending_keys if st.session_state.get(f"pcb_{key}")]
+            num_selected = len(selected_keys)
+            if st.button(f"🚀 Generar {num_selected} planes seleccionados", type="primary", use_container_width=True, disabled=(num_selected == 0)):
+                progress_bar = st.progress(0, text="Iniciando generación en lote de planes...")
+                items_to_generate = [matiz for matiz in subapartados_a_mostrar if matiz.get('subapartado') in selected_keys]
+                for i, matiz_a_generar in enumerate(items_to_generate):
+                    titulo = matiz_a_generar.get('subapartado')
+                    progress_text = f"Generando plan ({i+1}/{num_selected}): {titulo}"
+                    progress_bar.progress((i + 1) / num_selected, text=progress_text)
+                    handle_individual_generation(matiz_a_generar, model, show_toast=False)
+                progress_bar.progress(1.0, text="¡Generación en lote completada!")
+                st.success(f"{num_selected} planes de prompts generados.")
+                st.balloons()
+                st.rerun()
+
+    st.markdown("---")
+    st.subheader("Gestión de Planes de Prompts")
+
+    # =============================================================================
+    #           INTERFAZ DE GESTIÓN (HÍBRIDA Y OPTIMIZADA)
+    # =============================================================================
     for i, matiz in enumerate(subapartados_a_mostrar):
-        subapartado_titulo = matiz.get("subapartado")
+        subapartado_titulo = matiz.get("subapartado");
         if not subapartado_titulo: continue
-
         nombre_limpio = re.sub(r'[\\/*?:"<>|]', "", subapartado_titulo)
-        guion_generado = nombre_limpio in carpetas_con_info
+        guion_generado = nombre_limpio in carpetas_de_guiones
         plan_individual_id = planes_individuales_existentes.get(nombre_limpio)
 
         with st.container(border=True):
             col1, col2 = st.columns([2, 1])
             with col1:
-                st.write(f"**{subapartado_titulo}**")
-                if not guion_generado:
-                    st.warning("⚠️ Guion no generado en Fase 2. No se puede crear un plan de prompts.")
+                if not plan_individual_id and guion_generado:
+                    st.checkbox(f"**{subapartado_titulo}**", key=f"pcb_{subapartado_titulo}")
+                else: st.write(f"**{subapartado_titulo}**")
+                if not guion_generado: st.warning("⚠️ Guion no generado en Fase 2. No se puede crear un plan.")
                 elif plan_individual_id:
                     st.success("✔️ Plan generado")
                     with st.expander("Ver / Descargar Plan Individual"):
                         json_bytes = download_file_from_drive(service, plan_individual_id).getvalue()
                         st.json(json_bytes.decode('utf-8'))
                         st.download_button("Descargar JSON", data=json_bytes, file_name=f"prompts_{nombre_limpio}.json", mime="application/json", key=f"dl_{i}")
-                else:
-                    st.info("⚪ Pendiente de generar plan de prompts")
-            
+                else: st.info("⚪ Pendiente de generar plan de prompts")
             with col2:
-                if plan_individual_id:
-                    st.button("Re-generar Plan", key=f"gen_regen_{i}", on_click=handle_individual_generation, args=(matiz, model), use_container_width=True, type="secondary", disabled=not guion_generado)
+                if not plan_individual_id:
+                    st.button("Generar Plan de Prompts", key=f"gen_ind_{i}", on_click=handle_individual_generation, args=(matiz, model, True), use_container_width=True, type="primary", disabled=not guion_generado)
                 else:
-                    st.button("Generar Plan de Prompts", key=f"gen_{i}", on_click=handle_individual_generation, args=(matiz, model), use_container_width=True, type="primary", disabled=not guion_generado)
+                    st.button("Re-generar Plan", key=f"gen_regen_{i}", on_click=handle_individual_generation, args=(matiz, model, True), use_container_width=True, type="secondary")
 
-    # --- BOTONES DE NAVEGACIÓN ---
+    # --- BOTONES DE NAVEGACIÓN Y ACCIÓN FINAL ---
     st.markdown("---")
+    st.button("🚀 Unificar y Guardar Plan de Prompts Conjunto", on_click=handle_conjunto_generation, use_container_width=True, type="primary", help="Unifica todos los planes individuales generados en un único archivo maestro.")
     col_nav3_1, col_nav3_2 = st.columns(2)
     with col_nav3_1:
-        st.button("🚀 Generar Plan de Prompts Conjunto", on_click=handle_conjunto_generation, use_container_width=True, type="primary", help="Unifica todos los planes individuales generados en un único archivo maestro.")
-
+        st.button("← Volver al Centro de Mando (F2)", on_click=go_to_phase2, use_container_width=True)
     with col_nav3_2:
         st.button("Ir a Redacción Final (F4) →", on_click=go_to_phase4, use_container_width=True)
-
-    st.button("← Volver al Centro de Mando (F2)", on_click=go_to_phase2, use_container_width=True)
 # =============================================================================
 #           FASE 4 - REDACCIÓN Y ENSAMBLAJE FINAL
 # =============================================================================
