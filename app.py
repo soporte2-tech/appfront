@@ -23,7 +23,7 @@ import imgkit  # <-- Y AÑADE ESTA LÍNEA TAMBIÉN
 # =============================================================================
 #           BLOQUE COMPLETO DE CONFIGURACIÓN Y FUNCIONES DE DRIVE
 # =============================================================================
-
+st.set_page_config(layout="wide")
 
 SCOPES = [
     'https://www.googleapis.com/auth/drive',
