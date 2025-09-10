@@ -1450,6 +1450,10 @@ def phase_3_page(model):
 #           VERSIÓN FINAL Y MEJORADA DE phase_4_page (CON RE-GENERACIÓN)
 # =============================================================================
 
+# =============================================================================
+#           VERSIÓN FINAL Y CORREGIDA DE phase_4_page (CORRIGE INDENTATION)
+# =============================================================================
+
 def phase_4_page(model):
     """Página para ejecutar el plan de prompts y generar el documento Word final."""
     st.markdown("<h3>FASE 4: Redacción y Ensamblaje Final</h3>", unsafe_allow_html=True)
@@ -1483,86 +1487,94 @@ def phase_4_page(model):
         st.session_state.generated_doc_buffer = None
     if 'generated_doc_filename' not in st.session_state:
         st.session_state.generated_doc_filename = ""
-    def html_a_imagen(html_content, output_filename="imagen_html.png"):
-    try:
-        # Configuración para imgkit
-        options = {
-            'format': 'png',
-            'encoding': "UTF-8",
-            'quiet': '',
-            'width': 750 # Fijamos un ancho consistente con el CSS de la card
-        }
-        # Asegúrate de que el path a wkhtmltoimage está configurado si es necesario
-        # path_wkhtmltoimage = '/path/to/wkhtmltoimage'
-        # config = imgkit.config(wkhtmltoimage=path_wkhtmltoimage)
-        # imgkit.from_string(html_content, output_filename, options=options, config=config)
-        
-        # Versión simple que asume que wkhtmltoimage está en el PATH
-        imgkit.from_string(html_content, output_filename, options=options)
 
-        if os.path.exists(output_filename):
-            return output_filename
-        else:
-            st.warning(f"imgkit ejecutado pero el archivo '{output_filename}' no fue creado.")
+    # --- FUNCIÓN INTERNA CON LA INDENTACIÓN CORREGIDA ---
+    def html_a_imagen(html_content, output_filename="imagen_html.png"):
+        try:
+            options = {'format': 'png', 'encoding': "UTF-8", 'quiet': ''}
+            imgkit.from_string(html_content, output_filename, options=options)
+            if os.path.exists(output_filename):
+                return output_filename
             return None
-    except OSError as e:
-        # Este es el error más común: el programa no se encuentra
-        st.error(f"Error de imgkit: No se encontró 'wkhtmltoimage'. Asegúrate de que wkhtmltopdf esté instalado y en el PATH del sistema.")
-        st.error(f"Detalle del error: {e}")
-        return None
-    except Exception as e:
-        # Captura cualquier otro error de imgkit
-        st.error(f"Error inesperado al convertir HTML a imagen: {e}")
-        return None
+        except Exception as e:
+            st.error(f"Error al convertir HTML a imagen con imgkit: {e}")
+            st.warning("Asegúrate de tener 'wkhtmltopdf' en tu 'packages.txt'.")
+            return None
 
     # --- LÓGICA DE EJECUCIÓN ---
-
-    # El texto del botón cambia si ya hemos generado un documento
     button_text = "🔁 Volver a Generar Documento Final" if st.session_state.generated_doc_buffer else "🚀 Iniciar Redacción y Generar Documento Final"
     
     if st.button(button_text, type="primary", use_container_width=True):
         if not lista_de_prompts:
-            st.warning("El plan de acción está vacío. No hay nada que generar.")
-            return
+            st.warning("El plan de acción está vacío. No hay nada que generar."); return
 
         st.info("Iniciando el proceso de redacción... Esto puede tardar varios minutos.")
         progress_bar = st.progress(0, text="Configurando sesión de chat...")
 
         documento = docx.Document()
         chat_redaccion = model.start_chat()
-        
-        prompt_inicial = "..." # Tu prompt inicial para el chat
+        prompt_inicial = """
+        Eres un consultor experto redactando memorias técnicas. Tu única misión es redactar el contenido que te solicite,
+        ya sea en Markdown o código HTML completo. El objetivo es un informe claro, visual y directo. No añadas títulos
+        a menos que el prompt lo indique. Recuerda el toque humano y la coherencia. No dejes texto por completar.
+        """
         try:
             chat_redaccion.send_message(prompt_inicial)
             time.sleep(1)
         except Exception as e:
-            st.error(f"Error en el mensaje de configuración inicial con la IA: {e}")
-            return
+            st.error(f"Error en el mensaje de configuración inicial con la IA: {e}"); return
         
         ultimo_apartado_escrito, ultimo_subapartado_escrito = "", ""
         total_prompts = len(lista_de_prompts)
         
         for i, tarea in enumerate(lista_de_prompts):
-            # ... (Toda la lógica del bucle de generación de contenido permanece igual) ...
-            progress_text = f"Procesando Tarea {i+1}/{total_prompts}..."
+            progress_text = f"Procesando Tarea {i+1}/{total_prompts} (ID: {tarea.get('prompt_id', 'N/A')})"
             progress_bar.progress((i + 1) / total_prompts, text=progress_text)
-            # ... (Añadir títulos, enviar prompt, procesar respuesta HTML/Markdown, etc.) ...
-        
+            prompt_actual = tarea.get("prompt_para_asistente")
+            if not prompt_actual: continue
+            
+            apartado_actual = tarea.get("apartado_referencia", "Sin Apartado")
+            subapartado_actual = tarea.get("subapartado_referencia", "Sin Subapartado")
+            if apartado_actual != ultimo_apartado_escrito:
+                if ultimo_apartado_escrito != "": documento.add_page_break()
+                documento.add_heading(apartado_actual, level=1)
+                ultimo_apartado_escrito = apartado_actual; ultimo_subapartado_escrito = ""
+            if subapartado_actual and subapartado_actual != ultimo_subapartado_escrito:
+                documento.add_heading(subapartado_actual, level=2)
+                ultimo_subapartado_escrito = subapartado_actual
+
+            respuesta_ia = None
+            for attempt in range(3):
+                try:
+                    response = chat_redaccion.send_message(prompt_actual)
+                    respuesta_ia = response.text; time.sleep(1); break
+                except Exception as e:
+                    st.warning(f"Intento {attempt + 1} fallido para la tarea {i+1}: {e}. Reintentando..."); time.sleep(5)
+            
+            if respuesta_ia is None:
+                st.error(f"Fallo definitivo al generar contenido para la tarea {i+1}."); documento.add_paragraph(f"[ERROR AL GENERAR]"); continue
+
+            if '<!DOCTYPE html>' in respuesta_ia:
+                html_limpio = limpiar_respuesta_json(respuesta_ia)
+                nombre_img = f"temp_img_prompt_{i+1}.png"
+                image_file = html_a_imagen(html_limpio, output_filename=nombre_img)
+                if image_file and os.path.exists(image_file):
+                    documento.add_picture(image_file, width=docx.shared.Inches(6)); os.remove(image_file)
+                else: documento.add_paragraph(f"[ERROR AL GENERAR IMAGEN]")
+            else: agregar_markdown_a_word(documento, respuesta_ia)
+
         progress_bar.progress(1.0, text="Ensamblando y guardando el documento final...")
         
         project_name = st.session_state.selected_project['name']
         safe_project_name = re.sub(r'[\\/*?:"<>|]', "", project_name).replace(' ', '_')
         nombre_archivo_final = f"Memoria_Tecnica_{safe_project_name}.docx"
-
         doc_io = io.BytesIO()
         documento.save(doc_io)
         doc_io.seek(0)
         
-        # Guardamos el documento en la sesión para mostrar el botón de descarga
         st.session_state.generated_doc_buffer = doc_io
         st.session_state.generated_doc_filename = nombre_archivo_final
         
-        # Subir a Google Drive (la lógica permanece igual)
         try:
             word_file_obj = io.BytesIO(doc_io.getvalue())
             word_file_obj.name = nombre_archivo_final
@@ -1573,10 +1585,8 @@ def phase_4_page(model):
             st.toast(f"¡Documento '{nombre_archivo_final}' guardado en Drive!")
         except Exception as e:
             st.error(f"Error al guardar el documento en Drive: {e}")
-        
-        # No hacemos st.rerun() para que el botón de descarga aparezca inmediatamente
 
-    # --- SECCIÓN DE RESULTADOS (SOLO APARECE SI SE HA GENERADO UN DOCUMENTO) ---
+    # --- SECCIÓN DE RESULTADOS ---
     if st.session_state.generated_doc_buffer:
         st.balloons()
         st.success("¡Tu documento está listo!")
