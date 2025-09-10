@@ -782,6 +782,50 @@ def back_to_project_selection_and_cleanup():
         if key in st.session_state: del st.session_state[key]
     go_to_project_selection()
 
+def handle_full_regeneration(model):
+    """
+    Función centralizada que genera un índice completamente nuevo desde cero
+    analizando los archivos de la carpeta 'Pliegos'.
+    """
+    if not st.session_state.get('drive_service') or not st.session_state.get('selected_project'):
+        st.error("Error de sesión. No se puede iniciar la regeneración.")
+        return False
+
+    with st.spinner("Descargando archivos de 'Pliegos' y re-analizando desde cero..."):
+        try:
+            service = st.session_state.drive_service
+            project_folder_id = st.session_state.selected_project['id']
+            pliegos_folder_id = find_or_create_folder(service, "Pliegos", parent_id=project_folder_id)
+            document_files = get_files_in_project(service, pliegos_folder_id)
+
+            if not document_files:
+                st.warning("No se encontraron archivos en la carpeta 'Pliegos' para analizar.")
+                return False
+
+            downloaded_files_for_ia = []
+            for file in document_files:
+                file_content_bytes = download_file_from_drive(service, file['id'])
+                downloaded_files_for_ia.append({"mime_type": file['mimeType'], "data": file_content_bytes.getvalue()})
+
+            contenido_ia = [PROMPT_PLIEGOS]
+            contenido_ia.extend(downloaded_files_for_ia)
+            
+            generation_config = genai.GenerationConfig(response_mime_type="application/json")
+            response = model.generate_content(contenido_ia, generation_config=generation_config)
+            
+            json_limpio_str = limpiar_respuesta_json(response.text)
+            if json_limpio_str:
+                informacion_estructurada = json.loads(json_limpio_str)
+                st.session_state.generated_structure = informacion_estructurada
+                st.session_state.uploaded_pliegos = document_files # Actualizamos la lista de pliegos por si acaso
+                st.toast("✅ ¡Índice regenerado desde cero con éxito!")
+                return True
+            else:
+                st.error("La IA devolvió una respuesta vacía o no válida.")
+                return False
+        except Exception as e:
+            st.error(f"Ocurrió un error durante la regeneración completa: {e}")
+            return False
 
 # =============================================================================
 #                 PÁGINAS DE LA APLICACIÓN (NUEVA VERSIÓN)
@@ -879,7 +923,6 @@ def project_selection_page():
 # =============================================================================
 #           VERSIÓN DEFINITIVA DE phase_1_page()
 # =============================================================================
-
 def phase_1_page(model):
     """Página de Fase 1 que lee/escribe en subcarpetas y gestiona el estado correctamente."""
     if not st.session_state.get('selected_project'):
@@ -894,13 +937,9 @@ def phase_1_page(model):
     st.markdown(f"<h3>FASE 1: Análisis y Estructura</h3>", unsafe_allow_html=True)
     st.info(f"Estás trabajando en el proyecto: **{project_name}**")
 
-    # 1. Buscamos o creamos la subcarpeta 'Pliegos' y obtenemos su ID
     pliegos_folder_id = find_or_create_folder(service, "Pliegos", parent_id=project_folder_id)
-    
-    # 2. Buscamos los archivos DENTRO de esa subcarpeta 'Pliegos'
     document_files = get_files_in_project(service, pliegos_folder_id)
     
-    # 3. Mostramos SOLO los archivos encontrados en 'Pliegos'
     if document_files:
         st.success("Hemos encontrado estos archivos en la carpeta 'Pliegos' de tu proyecto:")
         with st.container(border=True):
@@ -923,7 +962,6 @@ def phase_1_page(model):
                 if new_files_uploader:
                     with st.spinner("Subiendo archivos a la carpeta 'Pliegos'..."):
                         for file_obj in new_files_uploader:
-                            # 4. Guardamos los nuevos archivos DENTRO de la subcarpeta 'Pliegos'
                             upload_file_to_drive(service, file_obj, pliegos_folder_id)
                         st.rerun()
                 else:
@@ -948,31 +986,11 @@ def phase_1_page(model):
                 st.rerun()
 
     with col2:
+        # Simplificamos este botón para que llame a la nueva función
         if st.button("Analizar Archivos y Generar Nuevo Índice", type="primary", use_container_width=True, disabled=not document_files):
-            with st.spinner("Descargando archivos de 'Pliegos' y analizando..."):
-                try:
-                    downloaded_files_for_ia = []
-                    for file in document_files:
-                        file_content_bytes = download_file_from_drive(service, file['id'])
-                        downloaded_files_for_ia.append({"mime_type": file['mimeType'], "data": file_content_bytes.getvalue()})
-
-                    contenido_ia = [PROMPT_PLIEGOS]
-                    contenido_ia.extend(downloaded_files_for_ia)
-                    
-                    generation_config = genai.GenerationConfig(response_mime_type="application/json")
-                    response = model.generate_content(contenido_ia, generation_config=generation_config)
-                    
-                    json_limpio_str = limpiar_respuesta_json(response.text)
-                    if json_limpio_str:
-                        informacion_estructurada = json.loads(json_limpio_str)
-                        st.session_state.generated_structure = informacion_estructurada
-                        st.session_state.uploaded_pliegos = document_files
-                        go_to_phase1_results()
-                        st.rerun()
-                    else:
-                        st.error("La IA devolvió una respuesta vacía o no válida.")
-                except Exception as e:
-                    st.error(f"Ocurrió un error: {e}")
+            if handle_full_regeneration(model):
+                go_to_phase1_results()
+                st.rerun()
 
     st.write("")
     st.markdown("---")
@@ -992,7 +1010,7 @@ def phase_1_page(model):
 def phase_1_results_page(model):
     """Página para revisar, regenerar, ACEPTAR el índice y SINCRONIZAR carpetas."""
     st.markdown("<h3>FASE 1: Revisión de Resultados</h3>", unsafe_allow_html=True)
-    st.markdown("Revisa y ajusta el índice. Al aceptarlo, se limpiarán las carpetas de guiones antiguas y se guardará la nueva estructura.")
+    st.markdown("Revisa el índice. Puedes hacer ajustes con feedback, regenerarlo todo desde cero, o aceptarlo para continuar.")
     st.markdown("---")
     st.button("← Volver a la gestión de archivos", on_click=go_to_phase1)
 
@@ -1000,8 +1018,7 @@ def phase_1_results_page(model):
         st.warning("No se ha generado ninguna estructura.")
         return
 
-    # --- FUNCIÓN INTERNA DE REGENERACIÓN (sin cambios) ---
-    def handle_regeneration():
+    def handle_regeneration_with_feedback():
         feedback_text = st.session_state.feedback_area
         if not feedback_text:
             st.warning("Por favor, escribe tus indicaciones en el área de texto.")
@@ -1009,7 +1026,6 @@ def phase_1_results_page(model):
 
         with st.spinner("🧠 Incorporando tu feedback y regenerando la estructura..."):
             try:
-                # ... (El código de esta función interna permanece igual) ...
                 contenido_ia_regeneracion = [PROMPT_REGENERACION]
                 contenido_ia_regeneracion.append("--- INSTRUCCIONES DEL USUARIO ---\n" + feedback_text)
                 contenido_ia_regeneracion.append("--- ESTRUCTURA JSON ANTERIOR A CORREGIR ---\n" + json.dumps(st.session_state.generated_structure, indent=2))
@@ -1018,26 +1034,21 @@ def phase_1_results_page(model):
                     service = st.session_state.drive_service
                     for file_info in st.session_state.uploaded_pliegos:
                         file_content_bytes = download_file_from_drive(service, file_info['id'])
-                        contenido_ia_regeneracion.append({
-                            "mime_type": file_info['mimeType'],
-                            "data": file_content_bytes.getvalue()
-                        })
+                        contenido_ia_regeneracion.append({"mime_type": file_info['mimeType'], "data": file_content_bytes.getvalue()})
 
                 generation_config = genai.GenerationConfig(response_mime_type="application/json")
                 response_regeneracion = model.generate_content(contenido_ia_regeneracion, generation_config=generation_config)
                 json_limpio_str_regenerado = limpiar_respuesta_json(response_regeneracion.text)
                 
                 if json_limpio_str_regenerado:
-                    nueva_estructura = json.loads(json_limpio_str_regenerado)
-                    st.session_state.generated_structure = nueva_estructura
-                    st.toast("¡Estructura regenerada con éxito!")
-                    st.session_state.feedback_area = ""
+                    st.session_state.generated_structure = json.loads(json_limpio_str_regenerado)
+                    st.toast("¡Estructura regenerada con feedback!")
+                    st.session_state.feedback_area = "" # Limpiamos el área de texto
                 else:
                     st.error("La IA no devolvió una estructura válida tras la regeneración.")
             except Exception as e:
                 st.error(f"Ocurrió un error durante la regeneración: {e}")
 
-    # --- Contenido principal de la página ---
     with st.container(border=True):
         mostrar_indice_desplegable(st.session_state.generated_structure.get('estructura_memoria'))
         st.markdown("---")
@@ -1045,46 +1056,42 @@ def phase_1_results_page(model):
         
         st.text_area("Si necesitas cambios, indícalos aquí:", key="feedback_area", placeholder="Ej: 'Une los apartados 1.1 y 1.2 en uno solo.'")
         
-        # AQUÍ SE CREAN LAS COLUMNAS DENTRO DE LA FUNCIÓN
-        col_val_1, col_val_2 = st.columns(2)
-        
-        with col_val_1:
-            st.button("Regenerar con Feedback", on_click=handle_regeneration, use_container_width=True, disabled=not st.session_state.get("feedback_area"))
+        # --- NUEVO LAYOUT DE BOTONES ---
+        col1, col2 = st.columns(2)
+        with col1:
+            st.button("Regenerar con Feedback", on_click=handle_regeneration_with_feedback, use_container_width=True, disabled=not st.session_state.get("feedback_area"))
+        with col2:
+            # ESTE ES TU NUEVO BOTÓN
+            st.button("🔁 Regenerar Índice Entero", on_click=handle_full_regeneration, args=(model,), use_container_width=True, help="Descarta este índice y genera uno nuevo desde cero analizando los pliegos otra vez.")
 
-        # --- INICIO DEL BLOQUE CORREGIDO Y EN SU LUGAR CORRECTO ---
-        with col_val_2:
-            if st.button("Aceptar Índice y Pasar a Fase 2 →", type="primary", use_container_width=True):
-                with st.spinner("Sincronizando carpetas y guardando índice final en Drive..."):
-                    try:
-                        service = st.session_state.drive_service
-                        project_folder_id = st.session_state.selected_project['id']
-                        
-                        # Llamamos a la función de sincronización que creaste
-                        deleted_count = sync_guiones_folders_with_index(service, project_folder_id, st.session_state.generated_structure)
-                        if deleted_count > 0:
-                            st.success(f"Limpieza completada: {deleted_count} carpetas de guiones obsoletas eliminadas.")
+        # Botón de aceptar ahora ocupa todo el ancho para destacar
+        if st.button("Aceptar Índice y Pasar a Fase 2 →", type="primary", use_container_width=True):
+            with st.spinner("Sincronizando carpetas y guardando índice final en Drive..."):
+                try:
+                    service = st.session_state.drive_service
+                    project_folder_id = st.session_state.selected_project['id']
+                    
+                    deleted_count = sync_guiones_folders_with_index(service, project_folder_id, st.session_state.generated_structure)
+                    if deleted_count > 0:
+                        st.success(f"Limpieza completada: {deleted_count} carpetas de guiones obsoletas eliminadas.")
 
-                        # Lógica original para guardar el nuevo índice
-                        docs_app_folder_id = find_or_create_folder(service, "Documentos aplicación", parent_id=project_folder_id)
+                    docs_app_folder_id = find_or_create_folder(service, "Documentos aplicación", parent_id=project_folder_id)
+                    json_bytes = json.dumps(st.session_state.generated_structure, indent=2).encode('utf-8')
+                    mock_file_obj = io.BytesIO(json_bytes)
+                    mock_file_obj.name = "ultimo_indice.json"
+                    mock_file_obj.type = "application/json"
+                    
+                    saved_index_id = find_file_by_name(service, "ultimo_indice.json", docs_app_folder_id)
+                    if saved_index_id:
+                        delete_file_from_drive(service, saved_index_id)
+                    upload_file_to_drive(service, mock_file_obj, docs_app_folder_id)
+                    st.toast("Índice final guardado en tu proyecto de Drive.")
+                    
+                    go_to_phase2()
+                    st.rerun()
 
-                        indice_final = st.session_state.generated_structure
-                        json_bytes = json.dumps(indice_final, indent=2).encode('utf-8')
-                        mock_file_obj = io.BytesIO(json_bytes)
-                        mock_file_obj.name = "ultimo_indice.json"
-                        mock_file_obj.type = "application/json"
-                        
-                        saved_index_id = find_file_by_name(service, "ultimo_indice.json", docs_app_folder_id)
-                        if saved_index_id:
-                            delete_file_from_drive(service, saved_index_id)
-                        upload_file_to_drive(service, mock_file_obj, docs_app_folder_id)
-                        st.toast("Índice final guardado en tu proyecto de Drive.")
-                        
-                        go_to_phase2()
-                        st.rerun()
-
-                    except Exception as e:
-                        st.error(f"Ocurrió un error durante la sincronización o guardado: {e}")
-        # --- FIN DEL BLOQUE CORREGIDO ---
+                except Exception as e:
+                    st.error(f"Ocurrió un error durante la sincronización o guardado: {e}")
 
 # =============================================================================
 #           REEMPLAZA TU phase_2_page ACTUAL POR ESTA VERSIÓN DEFINITIVA
