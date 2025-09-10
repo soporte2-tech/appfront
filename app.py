@@ -1056,15 +1056,23 @@ def phase_1_results_page(model):
         
         st.text_area("Si necesitas cambios, indícalos aquí:", key="feedback_area", placeholder="Ej: 'Une los apartados 1.1 y 1.2 en uno solo.'")
         
-        # --- NUEVO LAYOUT DE BOTONES ---
         col1, col2 = st.columns(2)
         with col1:
-            st.button("Regenerar con Feedback", on_click=handle_regeneration_with_feedback, use_container_width=True, disabled=not st.session_state.get("feedback_area"))
+            st.button(
+                "Regenerar con Feedback", 
+                on_click=handle_regeneration_with_feedback, 
+                use_container_width=True, 
+                disabled=not st.session_state.get("feedback_area")
+            )
         with col2:
-            # ESTE ES TU NUEVO BOTÓN
-            st.button("🔁 Regenerar Índice Entero", on_click=handle_full_regeneration, args=(model,), use_container_width=True, help="Descarta este índice y genera uno nuevo desde cero analizando los pliegos otra vez.")
+            st.button(
+                "🔁 Regenerar Índice Entero", 
+                on_click=handle_full_regeneration, 
+                args=(model,), 
+                use_container_width=True, 
+                help="Descarta este índice y genera uno nuevo desde cero analizando los pliegos otra vez."
+            )
 
-        # Botón de aceptar ahora ocupa todo el ancho para destacar
         if st.button("Aceptar Índice y Pasar a Fase 2 →", type="primary", use_container_width=True):
             with st.spinner("Sincronizando carpetas y guardando índice final en Drive..."):
                 try:
