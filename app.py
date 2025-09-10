@@ -1479,22 +1479,37 @@ def phase_4_page(model):
         return
 
     # Función para convertir HTML a imagen (adaptada para Streamlit)
-    def html_a_imagen(html_content, output_filename="imagen_html.png"):
-        try:
-            options = {
-                'format': 'png',
-                'encoding': "UTF-8",
-                'quiet': ''
-            }
-            # Usamos imgkit para generar la imagen desde el string HTML
-            imgkit.from_string(html_content, output_filename, options=options)
-            if os.path.exists(output_filename):
-                return output_filename
+def html_a_imagen(html_content, output_filename="imagen_html.png"):
+    try:
+        # Configuración para imgkit
+        options = {
+            'format': 'png',
+            'encoding': "UTF-8",
+            'quiet': '',
+            'width': 750 # Fijamos un ancho consistente con el CSS de la card
+        }
+        # Asegúrate de que el path a wkhtmltoimage está configurado si es necesario
+        # path_wkhtmltoimage = '/path/to/wkhtmltoimage'
+        # config = imgkit.config(wkhtmltoimage=path_wkhtmltoimage)
+        # imgkit.from_string(html_content, output_filename, options=options, config=config)
+        
+        # Versión simple que asume que wkhtmltoimage está en el PATH
+        imgkit.from_string(html_content, output_filename, options=options)
+
+        if os.path.exists(output_filename):
+            return output_filename
+        else:
+            st.warning(f"imgkit ejecutado pero el archivo '{output_filename}' no fue creado.")
             return None
-        except Exception as e:
-            st.error(f"Error al convertir HTML a imagen con imgkit: {e}")
-            st.warning("Asegúrate de tener 'wkhtmltopdf' en tu 'packages.txt'.")
-            return None
+    except OSError as e:
+        # Este es el error más común: el programa no se encuentra
+        st.error(f"Error de imgkit: No se encontró 'wkhtmltoimage'. Asegúrate de que wkhtmltopdf esté instalado y en el PATH del sistema.")
+        st.error(f"Detalle del error: {e}")
+        return None
+    except Exception as e:
+        # Captura cualquier otro error de imgkit
+        st.error(f"Error inesperado al convertir HTML a imagen: {e}")
+        return None
 
     # --- LÓGICA DE EJECUCIÓN ---
     if st.button("🚀 Iniciar Redacción y Generar Documento Final", type="primary", use_container_width=True):
