@@ -177,6 +177,52 @@ def list_project_folders(service, root_folder_id, retries=3):
         except Exception as e:
             st.error(f"Error inesperado al listar proyectos: {e}")
             return {}
+
+def sync_guiones_folders_with_index(service, project_folder_id, new_index_structure):
+    """
+    Compara las carpetas de guiones existentes en Drive con el nuevo índice.
+    Elimina las carpetas que ya no corresponden a ningún subapartado.
+    """
+    st.toast("🔄 Sincronizando carpetas de guiones con el nuevo índice...")
+    
+    # 1. Obtener la lista de nombres de carpetas ESPERADOS según el nuevo índice
+    expected_folders = set()
+    if 'estructura_memoria' in new_index_structure:
+        for seccion in new_index_structure.get('estructura_memoria', []):
+            for subapartado_titulo in seccion.get('subapartados', []):
+                # Usamos la misma lógica que en la fase 2 para crear nombres de carpeta
+                nombre_limpio = re.sub(r'[\\/*?:"<>|]', "", subapartado_titulo)
+                expected_folders.add(nombre_limpio)
+    
+    if not expected_folders:
+        st.warning("El nuevo índice no contiene subapartados. No se realizó ninguna limpieza.")
+        return 0
+
+    # 2. Obtener la lista de carpetas de guiones EXISTENTES en Google Drive
+    guiones_main_folder_id = find_or_create_folder(service, "Guiones de Subapartados", parent_id=project_folder_id)
+    # Reutilizamos la función que lista subcarpetas
+    existing_folders_map = list_project_folders(service, guiones_main_folder_id) # Devuelve {name: id}
+
+    # 3. Comparar y eliminar las obsoletas
+    deleted_count = 0
+    folders_to_delete = []
+    for folder_name, folder_id in existing_folders_map.items():
+        if folder_name not in expected_folders:
+            folders_to_delete.append((folder_name, folder_id))
+
+    if not folders_to_delete:
+        st.toast("✅ Las carpetas de guiones ya estaban sincronizadas.")
+        return 0
+        
+    with st.spinner(f"Eliminando {len(folders_to_delete)} carpetas de guiones obsoletas..."):
+        for folder_name, folder_id in folders_to_delete:
+            if delete_file_from_drive(service, folder_id):
+                st.toast(f"🗑️ Carpeta obsoleta eliminada: '{folder_name}'")
+                deleted_count += 1
+            else:
+                st.warning(f"No se pudo eliminar la carpeta obsoleta: '{folder_name}'")
+    
+    return deleted_count
 # --- PROMPTS DE LA IA ---
 # He copiado tus prompts directamente desde tu código de Colab.
 PROMPT_CONSULTOR_REVISION = """
@@ -998,12 +1044,22 @@ def phase_1_results_page(model):
         with col_val_1:
             st.button("Regenerar con Feedback", on_click=handle_regeneration, use_container_width=True, disabled=not st.session_state.get("feedback_area"))
 
-        with col_val_2:
+with col_val_2:
             if st.button("Aceptar Índice y Pasar a Fase 2 →", type="primary", use_container_width=True):
-                with st.spinner("Guardando índice final en Drive..."):
+                # Actualizamos el mensaje del spinner para que sea más informativo
+                with st.spinner("Sincronizando carpetas y guardando índice final en Drive..."):
                     try:
                         service = st.session_state.drive_service
                         project_folder_id = st.session_state.selected_project['id']
+                        
+                        # --- ¡AQUÍ ESTÁ LA MAGIA! ---
+                        # Llamamos a nuestra nueva función de sincronización ANTES de guardar el nuevo índice.
+                        deleted_count = sync_guiones_folders_with_index(service, project_folder_id, st.session_state.generated_structure)
+                        if deleted_count > 0:
+                            st.success(f"Limpieza completada: {deleted_count} carpetas de guiones obsoletas eliminadas.")
+                        # --- FIN DE LA NUEVA LÓGICA ---
+
+                        # Ahora continúa la lógica original para guardar el nuevo índice
                         docs_app_folder_id = find_or_create_folder(service, "Documentos aplicación", parent_id=project_folder_id)
 
                         indice_final = st.session_state.generated_structure
@@ -1022,8 +1078,8 @@ def phase_1_results_page(model):
                         st.rerun()
 
                     except Exception as e:
-                        st.error(f"Ocurrió un error al guardar el índice: {e}")
-
+                        # Hemos mejorado el mensaje de error para que sea más específico
+                        st.error(f"Ocurrió un error durante la sincronización o guardado: {e}")
 
 # =============================================================================
 #           REEMPLAZA TU phase_2_page ACTUAL POR ESTA VERSIÓN DEFINITIVA
