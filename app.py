@@ -775,6 +775,98 @@ def sanitize_json_string(json_str):
     # Reemplazamos los caracteres problemáticos por una cadena vacía.
     sanitized_str = control_chars_regex.sub('', json_str)
     return sanitized_str
+def wrap_html_fragment(html_fragment):
+    """
+    Toma un fragmento de HTML (ej: un <table> o <div>) y lo envuelve en una
+    estructura HTML completa con los estilos CSS necesarios para renderizarlo.
+    """
+    # Si ya es un documento completo, lo devuelve tal cual.
+    if html_fragment.strip().startswith('<!DOCTYPE html>'):
+        return html_fragment
+
+    # Estilos CSS extraídos de tu PROMPT_DESARROLLO.
+    # Son necesarios para que las tablas y cards se vean bien.
+    css_styles = """
+        @import url('https://fonts.googleapis.com/css2?family=Urbanist:wght@400;600;700&display=swap');
+        body {
+            font-family: 'Urbanist', sans-serif;
+            background-color: #f0f2f5;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            width: 800px;
+            box-sizing: border-box;
+        }
+        .card {
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            padding: 25px;
+            width: 100%;
+            max-width: 750px;
+            border-top: 5px solid #0046C6;
+        }
+        h2 {
+            color: #0046C6;
+            text-align: center;
+            margin-top: 0;
+            font-size: 24px;
+            font-weight: 700;
+        }
+        ul { list-style-type: none; padding: 0; }
+        li {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+            font-size: 16px;
+            color: #333;
+        }
+        li::before {
+            content: '✔';
+            color: #32CFAA;
+            font-size: 20px;
+            font-weight: bold;
+            margin-right: 15px;
+        }
+        /* Estilos adicionales para tablas */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            font-size: 15px;
+        }
+        th, td {
+            padding: 12px 15px;
+            border: 1px solid #ddd;
+            text-align: left;
+        }
+        th {
+            background-color: #f5f5f5;
+            font-weight: 600;
+            color: #333;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+    """
+    
+    # Plantilla HTML completa
+    full_html_template = f"""
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Visual Element</title>
+        <style>{css_styles}</style>
+    </head>
+    <body>
+        {html_fragment}
+    </body>
+    </html>
+    """
+    return full_html_template
 
 # --- NAVEGACIÓN Y GESTIÓN DE ESTADO (actualizada) ---
 if 'page' not in st.session_state: st.session_state.page = 'landing'
@@ -1457,7 +1549,7 @@ def phase_3_page(model):
 def phase_4_page(model):
     """Página para ejecutar el plan de prompts y generar el documento Word final."""
     st.markdown("<h3>FASE 4: Redacción y Ensamblaje Final</h3>", unsafe_allow_html=True)
-    st.markdown("Ejecuta el plan de prompts conjunto para generar el contenido de la memoria técnica y descargar el documento Word final.")
+    st.markdown("Ejecuta el plan de prompts para generar el contenido de la memoria técnica y descargar el documento final.")
     st.markdown("---")
 
     # --- SETUP ROBUSTO Y CARGA DEL PLAN CONJUNTO ---
@@ -1468,8 +1560,7 @@ def phase_4_page(model):
     plan_conjunto_id = find_file_by_name(service, "plan_de_prompts_conjunto.json", docs_app_folder_id)
 
     if not plan_conjunto_id:
-        st.warning("No se ha encontrado un 'plan_de_prompts_conjunto.json'.")
-        st.info("Por favor, vuelve a la Fase 3 y genera el plan conjunto antes de continuar.")
+        st.warning("No se ha encontrado un 'plan_de_prompts_conjunto.json'. Vuelve a la Fase 3 para generarlo.")
         if st.button("← Ir a Fase 3"): go_to_phase3(); st.rerun()
         return
 
@@ -1477,116 +1568,114 @@ def phase_4_page(model):
         json_bytes = download_file_from_drive(service, plan_conjunto_id).getvalue()
         plan_de_accion = json.loads(json_bytes.decode('utf-8'))
         lista_de_prompts = plan_de_accion.get("plan_de_prompts", [])
-        st.success(f"✔️ Plan de acción conjunto cargado con éxito. Se encontraron {len(lista_de_prompts)} prompts para ejecutar.")
+        st.success(f"✔️ Plan de acción cargado. Se encontraron {len(lista_de_prompts)} prompts para ejecutar.")
     except Exception as e:
-        st.error(f"Error al cargar o procesar el plan de acción desde Drive: {e}")
+        st.error(f"Error al cargar el plan de acción desde Drive: {e}")
         return
 
-    # --- INICIALIZACIÓN DE ESTADO PARA GUARDAR EL DOCUMENTO GENERADO ---
+    # --- INICIALIZACIÓN DE ESTADO PARA EL DOCUMENTO GENERADO ---
     if 'generated_doc_buffer' not in st.session_state:
         st.session_state.generated_doc_buffer = None
     if 'generated_doc_filename' not in st.session_state:
         st.session_state.generated_doc_filename = ""
 
-    # --- FUNCIÓN INTERNA CON LA INDENTACIÓN CORREGIDA ---
-    def html_a_imagen(html_content, output_filename="imagen_html.png"):
-        try:
-            options = {'format': 'png', 'encoding': "UTF-8", 'quiet': ''}
-            imgkit.from_string(html_content, output_filename, options=options)
-            if os.path.exists(output_filename):
-                return output_filename
-            return None
-        except Exception as e:
-            st.error(f"Error al convertir HTML a imagen con imgkit: {e}")
-            st.warning("Asegúrate de tener 'wkhtmltopdf' en tu 'packages.txt'.")
-            return None
-
     # --- LÓGICA DE EJECUCIÓN ---
-    button_text = "🔁 Volver a Generar Documento Final" if st.session_state.generated_doc_buffer else "🚀 Iniciar Redacción y Generar Documento Final"
+    button_text = "🔁 Volver a Generar Documento" if st.session_state.generated_doc_buffer else "🚀 Iniciar Redacción y Generar Documento"
     
     if st.button(button_text, type="primary", use_container_width=True):
         if not lista_de_prompts:
-            st.warning("El plan de acción está vacío. No hay nada que generar."); return
+            st.warning("El plan de acción está vacío."); return
 
-        st.info("Iniciando el proceso de redacción... Esto puede tardar varios minutos.")
-        progress_bar = st.progress(0, text="Configurando sesión de chat...")
+        with st.spinner("Iniciando redacción... Esto puede tardar varios minutos."):
+            progress_bar = st.progress(0, text="Configurando sesión de chat...")
 
-        documento = docx.Document()
-        chat_redaccion = model.start_chat()
-        prompt_inicial = """
-        Eres un consultor experto redactando memorias técnicas. Tu única misión es redactar el contenido que te solicite,
-        ya sea en Markdown o código HTML completo. El objetivo es un informe claro, visual y directo. No añadas títulos
-        a menos que el prompt lo indique. Recuerda el toque humano y la coherencia. No dejes texto por completar.
-        """
-        try:
-            chat_redaccion.send_message(prompt_inicial)
-            time.sleep(1)
-        except Exception as e:
-            st.error(f"Error en el mensaje de configuración inicial con la IA: {e}"); return
-        
-        ultimo_apartado_escrito, ultimo_subapartado_escrito = "", ""
-        total_prompts = len(lista_de_prompts)
-        
-        for i, tarea in enumerate(lista_de_prompts):
-            progress_text = f"Procesando Tarea {i+1}/{total_prompts} (ID: {tarea.get('prompt_id', 'N/A')})"
-            progress_bar.progress((i + 1) / total_prompts, text=progress_text)
-            prompt_actual = tarea.get("prompt_para_asistente")
-            if not prompt_actual: continue
+            documento = docx.Document()
+            chat_redaccion = model.start_chat()
             
-            apartado_actual = tarea.get("apartado_referencia", "Sin Apartado")
-            subapartado_actual = tarea.get("subapartado_referencia", "Sin Subapartado")
-            if apartado_actual != ultimo_apartado_escrito:
-                if ultimo_apartado_escrito != "": documento.add_page_break()
-                documento.add_heading(apartado_actual, level=1)
-                ultimo_apartado_escrito = apartado_actual; ultimo_subapartado_escrito = ""
-            if subapartado_actual and subapartado_actual != ultimo_subapartado_escrito:
-                documento.add_heading(subapartado_actual, level=2)
-                ultimo_subapartado_escrito = subapartado_actual
+            # (El resto de la lógica de inicialización del chat y bucle se mantiene igual)
+            # ...
+            # AQUÍ VIENE EL CAMBIO CLAVE DENTRO DEL BUCLE
+            
+            ultimo_apartado_escrito, ultimo_subapartado_escrito = "", ""
+            total_prompts = len(lista_de_prompts)
+            
+            for i, tarea in enumerate(lista_de_prompts):
+                # ... (código para actualizar la barra de progreso y obtener el prompt) ...
+                progress_text = f"Procesando Tarea {i+1}/{total_prompts} (ID: {tarea.get('prompt_id', 'N/A')})"
+                progress_bar.progress((i + 1) / total_prompts, text=progress_text)
+                prompt_actual = tarea.get("prompt_para_asistente")
+                if not prompt_actual: continue
 
-            respuesta_ia = None
-            for attempt in range(3):
+                # ... (código para añadir títulos de apartado/subapartado) ...
+                apartado_actual = tarea.get("apartado_referencia", "Sin Apartado")
+                subapartado_actual = tarea.get("subapartado_referencia", "Sin Subapartado")
+                if apartado_actual != ultimo_apartado_escrito:
+                    if ultimo_apartado_escrito != "": documento.add_page_break()
+                    documento.add_heading(apartado_actual, level=1)
+                    ultimo_apartado_escrito = apartado_actual; ultimo_subapartado_escrito = ""
+                if subapartado_actual and subapartado_actual != ultimo_subapartado_escrito:
+                    documento.add_heading(subapartado_actual, level=2)
+                    ultimo_subapartado_escrito = subapartado_actual
+
+                # ... (código para llamar a la IA con reintentos) ...
+                respuesta_ia = None
+                for attempt in range(3):
+                    try:
+                        response = chat_redaccion.send_message(prompt_actual)
+                        respuesta_ia = response.text.strip(); time.sleep(1); break
+                    except Exception as e:
+                        st.warning(f"Intento {attempt + 1} fallido: {e}. Reintentando..."); time.sleep(5)
+                
+                if respuesta_ia is None:
+                    st.error(f"Fallo definitivo al generar tarea {i+1}."); continue
+
+                # =================== ¡AQUÍ ESTÁ LA NUEVA LÓGICA! ===================
+                # Comprobación flexible para cualquier tipo de HTML
+                if respuesta_ia.startswith('<') and respuesta_ia.endswith('>'):
+                    html_completo = wrap_html_fragment(respuesta_ia)
+                    nombre_img = f"temp_img_{i}.png"
+                    image_file = html_a_imagen(html_completo, output_filename=nombre_img)
+                    if image_file and os.path.exists(image_file):
+                        try:
+                            documento.add_picture(image_file, width=docx.shared.Inches(6.5))
+                            os.remove(image_file)
+                        except Exception as e:
+                            st.error(f"Error al añadir imagen al DOCX: {e}")
+                            documento.add_paragraph(f"[ERROR AL INSERTAR IMAGEN]")
+                    else:
+                        documento.add_paragraph(f"[ERROR AL RENDERIZAR IMAGEN]")
+                else:
+                    agregar_markdown_a_word(documento, respuesta_ia)
+                # =================================================================
+
+            # --- GUARDADO Y ALMACENAMIENTO EN SESIÓN ---
+            progress_bar.progress(1.0, text="Ensamblando documento final...")
+            
+            project_name = st.session_state.selected_project['name']
+            safe_project_name = re.sub(r'[\\/*?:"<>|]', "", project_name).replace(' ', '_')
+            nombre_archivo_final = f"Memoria_Tecnica_{safe_project_name}.docx"
+            doc_io = io.BytesIO()
+            documento.save(doc_io)
+            doc_io.seek(0)
+            
+            st.session_state.generated_doc_buffer = doc_io
+            st.session_state.generated_doc_filename = nombre_archivo_final
+            
+            # Subir a Drive
+            with st.spinner("Guardando documento final en Google Drive..."):
                 try:
-                    response = chat_redaccion.send_message(prompt_actual)
-                    respuesta_ia = response.text; time.sleep(1); break
+                    word_file_obj = io.BytesIO(doc_io.getvalue())
+                    word_file_obj.name = nombre_archivo_final
+                    word_file_obj.type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    old_file_id = find_file_by_name(service, nombre_archivo_final, docs_app_folder_id)
+                    if old_file_id: delete_file_from_drive(service, old_file_id)
+                    upload_file_to_drive(service, word_file_obj, docs_app_folder_id)
+                    st.toast(f"¡'{nombre_archivo_final}' guardado en Drive!")
                 except Exception as e:
-                    st.warning(f"Intento {attempt + 1} fallido para la tarea {i+1}: {e}. Reintentando..."); time.sleep(5)
-            
-            if respuesta_ia is None:
-                st.error(f"Fallo definitivo al generar contenido para la tarea {i+1}."); documento.add_paragraph(f"[ERROR AL GENERAR]"); continue
+                    st.error(f"Error al guardar en Drive: {e}")
+            st.rerun() # Recargamos para mostrar la sección de descarga
 
-            if '<!DOCTYPE html>' in respuesta_ia:
-                html_limpio = limpiar_respuesta_json(respuesta_ia)
-                nombre_img = f"temp_img_prompt_{i+1}.png"
-                image_file = html_a_imagen(html_limpio, output_filename=nombre_img)
-                if image_file and os.path.exists(image_file):
-                    documento.add_picture(image_file, width=docx.shared.Inches(6)); os.remove(image_file)
-                else: documento.add_paragraph(f"[ERROR AL GENERAR IMAGEN]")
-            else: agregar_markdown_a_word(documento, respuesta_ia)
-
-        progress_bar.progress(1.0, text="Ensamblando y guardando el documento final...")
-        
-        project_name = st.session_state.selected_project['name']
-        safe_project_name = re.sub(r'[\\/*?:"<>|]', "", project_name).replace(' ', '_')
-        nombre_archivo_final = f"Memoria_Tecnica_{safe_project_name}.docx"
-        doc_io = io.BytesIO()
-        documento.save(doc_io)
-        doc_io.seek(0)
-        
-        st.session_state.generated_doc_buffer = doc_io
-        st.session_state.generated_doc_filename = nombre_archivo_final
-        
-        try:
-            word_file_obj = io.BytesIO(doc_io.getvalue())
-            word_file_obj.name = nombre_archivo_final
-            word_file_obj.type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-            old_file_id = find_file_by_name(service, nombre_archivo_final, docs_app_folder_id)
-            if old_file_id: delete_file_from_drive(service, old_file_id)
-            upload_file_to_drive(service, word_file_obj, docs_app_folder_id)
-            st.toast(f"¡Documento '{nombre_archivo_final}' guardado en Drive!")
-        except Exception as e:
-            st.error(f"Error al guardar el documento en Drive: {e}")
-
-    # --- SECCIÓN DE RESULTADOS ---
+    # --- SECCIÓN DE RESULTADOS Y DESCARGA ---
     if st.session_state.generated_doc_buffer:
         st.balloons()
         st.success("¡Tu documento está listo!")
