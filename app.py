@@ -462,17 +462,17 @@ Genera únicamente el objeto JSON corregido. No incluyas ningún texto fuera de 
 
 PROMPT_DESARROLLO = """
     **ATENCIÓN: REGLA CRÍTICA Y NO NEGOCIABLE**
-    Tu única salida es el contenido final solicitado (texto en Markdown o un único bloque de código HTML). ESTÁ ABSOLUTAMENTE PROHIBIDO generar cualquier texto que analice, comente, critique o sugiera mejoras sobre tu propia salida. Frases como "Este código HTML...", "Puntos fuertes:", "Sugerencias:", "HTML mejorado", "Metodología de Acompañamiento (HTML)" o "PROMPT_ID..." resultarán en un fallo. Debes actuar como el redactor final, no como un revisor de código. Tu respuesta debe ser directamente el contenido, lista para ser insertada en el documento.
+    Tu única salida debe ser el contenido final solicitado (texto en Markdown o un único bloque de código HTML). ESTÁ ABSOLUTAMENTE PROHIBIDO generar cualquier texto que analice, comente o critique tu propia salida. Frases como "Este código HTML...", "Aquí tienes una versión modificada...", "El código proporcionado...", "Puntos fuertes:", "Sugerencias:", "HTML mejorado", o cualquier tipo de análisis meta, resultarán en un fallo. Debes actuar como un redactor final, no como un revisor de código. Tu respuesta debe ser directamente el contenido, lista para ser insertada en el documento. NO expliques tu trabajo, solo hazlo.
 
     Actúa como un consultor experto redactando una memoria técnica para una licitación pública. Tu tarea es generar el contenido para un subapartado específico de la memoria. La redacción debe ser profesional, directa y visualmente amena.
     
-    El objetivo es crear un texto final y completo, no un borrador ni instrucciones para un humano. No pidas que se añada nada. Genera tú todo el contenido necesario.
+    El objetivo es crear un texto final y completo, no un borrador ni instrucciones para un humano. No pidas que se añada nada, genera tú todo el contenido.
 
     REGLAS DE REDACCIÓN:
     1.  **Contenido Completo:** Genera el texto completo para el subapartado basándote en el contexto de los pliegos y el guion proporcionado.
     2.  **Coherencia:** Haz referencia a conceptos mencionados en apartados anteriores para dar cohesión al documento. La redacción debe ser fluida y parecer escrita por un humano.
-    3.  **Elementos Visuales:** Si el contenido se puede resumir o presentar mejor visualmente (fases, pilares, ventajas), genera un elemento visual. Para ello, **genera únicamente el código HTML completo** usando una de las plantillas de abajo. El texto introductorio al elemento visual debe ser natural, como "A continuación, se detallan las fases en el siguiente esquema:".
-    4.  **Tono y Estilo:** Utiliza un tono profesional e impersonal (tercera persona). Sé concreto, evita frases vacías y orienta el contenido a resolver los problemas del cliente. No uses un lenguaje excesivamente formal ni abreviaturas extrañas.
+    3.  **Elementos Visuales:** Si el contenido se puede resumir mejor visualmente (fases, pilares, ventajas), genera un elemento visual. Para ello, **genera únicamente el código HTML completo usando una de las plantillas de abajo. ESTÁ PROHIBIDO generar cualquier otro tipo de código o sintaxis como Mermaid.** El texto introductorio al elemento visual debe ser natural, como "A continuación, se detallan las fases en el siguiente esquema:".
+    4.  **Tono y Estilo:** Utiliza un tono profesional e impersonal (tercera persona). Sé concreto, evita frases vacías y orienta el contenido a resolver los problemas del cliente.
     5.  **Prohibiciones:**
         -   NO uses frases de relleno como "En su compromiso con...".
         -   NO repitas el nombre de la empresa constantemente.
