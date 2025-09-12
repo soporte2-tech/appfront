@@ -1664,7 +1664,7 @@ import imgkit # Y esta también
 # =============================================================================
 
 def phase_4_page(model):
-    """Página para ejecutar el plan de prompts y generar el documento Word final."""
+    ""Página para ejecutar el plan de prompts y generar el documento Word final.""
     st.markdown("<h3>FASE 4: Redacción y Ensamblaje Final</h3>", unsafe_allow_html=True)
     st.markdown("Ejecuta el plan de prompts para generar el contenido de la memoria técnica y descargar el documento final.")
     st.markdown("---")
