@@ -868,6 +868,45 @@ def wrap_html_fragment(html_fragment):
     """
     return full_html_template
 
+def html_a_imagen(html_string, output_filename="temp_image.png"):
+    """
+    Convierte una cadena de HTML en una imagen PNG, encontrando automáticamente
+    el ejecutable wkhtmltoimage en el entorno de Streamlit Cloud.
+    """
+    try:
+        # En Streamlit Cloud, el ejecutable se instala en una ruta accesible.
+        # 'which' es un comando de Linux para encontrar la ruta de un programa.
+        path_wkhtmltoimage = os.popen('which wkhtmltoimage').read().strip()
+
+        if not path_wkhtmltoimage:
+            st.error("❌ El ejecutable 'wkhtmltoimage' no se encontró. Asegúrate de que 'wkhtmltopdf' está en tu packages.txt y que la app ha sido reiniciada.")
+            return None
+
+        # Crea una configuración para imgkit apuntando al ejecutable encontrado.
+        config = imgkit.config(wkhtmltoimage=path_wkhtmltoimage)
+        
+        # Opciones para mejorar la calidad y el tamaño de la imagen
+        options = {
+            'format': 'png',
+            'encoding': "UTF-8",
+            'width': '800',  # Un ancho fijo para consistencia
+            'quiet': ''      # Suprime la salida de la consola
+        }
+
+        # Genera la imagen desde la cadena de HTML
+        imgkit.from_string(html_string, output_filename, config=config, options=options)
+        
+        if os.path.exists(output_filename):
+            return output_filename
+        else:
+            st.warning(f"imgkit ejecutado pero el archivo '{output_filename}' no fue creado.")
+            return None
+
+    except Exception as e:
+        st.error(f"Ocurrió un error al convertir HTML a imagen: {e}")
+        st.code(f"Path de wkhtmltoimage intentado: {os.popen('which wkhtmltoimage').read().strip()}", language="bash")
+        return None
+
 # --- NAVEGACIÓN Y GESTIÓN DE ESTADO (actualizada) ---
 if 'page' not in st.session_state: st.session_state.page = 'landing'
 if 'credentials' not in st.session_state: st.session_state.credentials = None
