@@ -1591,10 +1591,7 @@ def phase_4_page(model):
         json_bytes = download_file_from_drive(service, plan_conjunto_id).getvalue()
         plan_de_accion = json.loads(json_bytes.decode('utf-8'))
         lista_de_prompts = plan_de_accion.get("plan_de_prompts", [])
-        
-        # CORRECCIÓN 1: Ordenar la lista de prompts para garantizar el orden numérico
         lista_de_prompts.sort(key=lambda x: x.get('prompt_id', ''))
-        
         st.success(f"✔️ Plan de acción cargado y ordenado. Se ejecutarán {len(lista_de_prompts)} prompts.")
     except Exception as e:
         st.error(f"Error al cargar o procesar el plan de acción: {e}"); return
@@ -1611,25 +1608,32 @@ def phase_4_page(model):
             progress_bar = st.progress(0, text="Configurando sesión de chat...")
             documento = docx.Document()
             chat_redaccion = model.start_chat()
-            ultimo_apartado_escrito, ultimo_subapartado_escrito = "", ""
+            
+            # --- LÓGICA DE ENCABEZADOS REESCRITA ---
+            ultimo_apartado_escrito = None
+            ultimo_subapartado_escrito = None
             
             for i, tarea in enumerate(lista_de_prompts):
                 progress_text = f"Procesando Tarea {i+1}/{len(lista_de_prompts)}: {tarea.get('subapartado_referencia', 'N/A')}"
                 progress_bar.progress((i + 1) / len(lista_de_prompts), text=progress_text)
                 
-                # CORRECCIÓN 2: Lógica de encabezados mejorada para evitar duplicados
-                apartado_actual = tarea.get("apartado_referencia", "Sin Apartado")
-                subapartado_actual = tarea.get("subapartado_referencia", "Sin Subapartado")
+                apartado_actual = tarea.get("apartado_referencia")
+                subapartado_actual = tarea.get("subapartado_referencia")
 
+                # Escribe el encabezado del Apartado Principal (Nivel 1) solo si es nuevo
                 if apartado_actual and apartado_actual != ultimo_apartado_escrito:
-                    if ultimo_apartado_escrito: documento.add_page_break()
+                    if ultimo_apartado_escrito is not None:  # Añade salto de página excepto antes del primero
+                        documento.add_page_break()
                     documento.add_heading(apartado_actual, level=1)
                     ultimo_apartado_escrito = apartado_actual
-                    ultimo_subapartado_escrito = "" # Reseteamos el subapartado
-                
+                    ultimo_subapartado_escrito = None # Resetea el subapartado al cambiar de sección
+
+                # Escribe el encabezado del Subapartado (Nivel 2) solo si es nuevo
                 if subapartado_actual and subapartado_actual != ultimo_subapartado_escrito:
                     documento.add_heading(subapartado_actual, level=2)
                     ultimo_subapartado_escrito = subapartado_actual
+                
+                # --- FIN DE LA LÓGICA REESCRITA ---
 
                 respuesta_ia = None
                 prompt_actual = tarea.get("prompt_para_asistente")
@@ -1658,6 +1662,7 @@ def phase_4_page(model):
                     else:
                         agregar_markdown_a_word(documento, respuesta_ia)
 
+            # Lógica de guardado (sin cambios)
             project_name = st.session_state.selected_project['name']
             safe_project_name = re.sub(r'[\\/*?:"<>|]', "", project_name).replace(' ', '_')
             nombre_archivo_final = f"Memoria_Tecnica_{safe_project_name}.docx"
