@@ -476,86 +476,125 @@ PROMPT_DESARROLLO = """
     5.1 Está prohibido poner explícitamente algo de cómo ha sido la estructura o que hay referencias de prompts como "(referencia a PROMPT_1_1_B)". Si tienes que poner alguna referencia de algún sitio pon el apartado. Si no sabes que apartado es, opta por no poner nada de la referencia. No pueden detectar que este trabajo ha sido realizado con IA.
     6. No dudes en añadir tablas que resuman el contenido. Debes usar bullet points y listas para dar las ideas de una manera más clara para que el lector se sienta cómodo al leerlo. Lo ideal es que haya un número coherente de tablas, listados y elementos htmls sin resultar repetitivo. Siempre siguiendo un balance de 75% texto normal y 25% tablas, elementos gráficos html y listas fáciles de ver.
     7. Evita las conclusiones si van a ser redundantes. Suelen ser un sintoma de que se usa IA, así que saltatelas o no las empieces con expresiones como 'En definitiva' o 'En conclusión'. El objetivo es ser ameno y directo, y este tipo de secciones impiden llegar a ese objetivo.
-    8. **REGLA DE ORO PARA ELEMENTOS VISUALES:** Si necesitas crear un elemento visual, DEBES generar un archivo HTML completo y auto-contenido. NO PUEDES generar solo CSS. Tu respuesta DEBE ser únicamente el código HTML, empezando con `<!DOCTYPE html>`. OBLIGATORIAMENTE, usa la siguiente plantilla base y solo modifica el contenido de los placeholders `<!-- TÍTULO AQUÍ -->` y `<!-- LISTA DE ELEMENTOS AQUÍ -->`. No alteres la estructura ni el CSS.
+    8. **REGLA DE ORO PARA ELEMENTOS VISUALES:** Si necesitas crear un elemento visual, DEBES generar un archivo HTML completo y auto-contenido. NO PUEDES generar solo CSS. Tu respuesta DEBE ser únicamente el código HTML, empezando con `<!DOCTYPE html>`. 
+    9.  **PROHIBIDO ANALIZAR O COMENTAR:** Bajo NINGUNA circunstancia puedes escribir texto que analice, comente, critique o sugiera mejoras sobre el contenido que generas. Frases como "Este código HTML crea...", "Puntos fuertes:", "Sugerencias de mejora:" o "Implementando estas mejoras..." están TOTALMENTE PROHIBIDAS. Tu salida debe ser el contenido final, no una conversación sobre él.
+    10.  **SALIDA DIRECTA Y PURA:** Si se pide texto, genera solo el texto. Si se pide un elemento visual HTML, genera solo el código HTML. No añadas introducciones ni conclusiones a menos que el prompt específico lo pida.
+    11.  **TONO Y ESTILO:** Mantén un tono profesional, impersonal (tercera persona), concreto y alineado con los pliegos, aplicando todas las reglas de estilo (no repetir ideas, ser concreto, etc.) que ya conoces.
+HERRAMIENTAS VISUALES A TU DISPOSICIÓN:
 
-        ```html
-        <!DOCTYPE html>
-        <html lang="es">
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Visual Element</title>
-            <style>
-                @import url('https://fonts.googleapis.com/css2?family=Urbanist:wght@400;600;700&display=swap');
-                body {{
-                    font-family: 'Urbanist', sans-serif;
-                    background-color: #f0f2f5;
-                    display: flex;
-                    justify-content: center;
-                    align-items: center;
-                    padding: 20px;
-                    width: 800px;
-                    box-sizing: border-box;
-                }}
-                .card {{
-                    background-color: white;
-                    border-radius: 10px;
-                    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-                    padding: 25px;
-                    width: 100%;
-                    max-width: 750px;
-                    border-top: 5px solid #0046C6;
-                }}
-                h2 {{
-                    color: #0046C6;
-                    text-align: center;
-                    margin-top: 0;
-                    font-size: 24px;
-                    font-weight: 700;
-                }}
-                ul {{
-                    list-style-type: none;
-                    padding: 0;
-                }}
-                li {{
-                    display: flex;
-                    align-items: center;
-                    margin-bottom: 15px;
-                    font-size: 16px;
-                    color: #333;
-                }}
-                li::before {{
-                    content: '✔';
-                    color: #32CFAA;
-                    font-size: 20px;
-                    font-weight: bold;
-                    margin-right: 15px;
-                }}
-            </style>
-        </head>
-        <body>
-            <div class="card">
-                <h2><!-- TÍTULO AQUÍ --></h2>
-                <ul>
-                    <!-- LISTA DE ELEMENTOS AQUÍ (usa <li>Elemento 1</li>, <li>Elemento 2</li>, etc.) -->
-                </ul>
-            </div>
-        </body>
-        </html>
-        ```
-    9. Debes cumplir todos los criterios pero sin mencionar que tu objetivo es cumplirlos. Es decir, debes hacer lo que se valora pero sin decir que esa sección existe para cumplir con un criterio. La redacción y el parafraseo debe ser muy elegante para demostrar un dominio y cumplimiento de los objetivos sin sonar pesado.
-    10. No uses recursos como el ;, los : y ese tipo de expresiones que parecen hechas con IA. Tampoco uses expresiones precedidas por -. Debes prafasear mucho. Tu texto debe parecer natural sin perder la profesionalidad.
-    11. Debes establecer el mismo idioma para todas las redacciones. Este idioma debe ser el castellano.
-    12. Debes poner mucho detalle en los cronogramas. Detalla bien las fases y bájalo a semanas. En las actividades detalla bien cuánto tiempo llevan y qué se va a hacer en cada una de ellas. Especifica detalladamente las actividades o los objetos de contratación propuestos para que se vean como un plan de acción más que como algo teórico, que el que evalúa el contenido pueda ver claramente qué es exactamente lo que se va a hacer o ofrecer.
-    13. Si se habla de KPIs de evaluación, propón unos realistas y que estén relacionados con la empresa. Explica porqué esos indicadores, en qué consistirán y cómo se utilizarán para evaluar el desempeño. Hazlo desde un marco que no comprometa a la empresa (es decir que sean realistas) y que de una imagen de profesionalidad al evaluador.
-    14. No puedes mencionar las cualidades y atributos de la empresa cada dos por tres. Debes evitar el exceso de retórica, repetición continua de “metodología validada en mas de 1000 proyectos”, “índice de satisfacción 9.6”, “aliado estratégico...”. Eso suena a texto estandar y no convence. Debes ser directo, pulcro y evitar el meter contenido que no aporte valor. Evita frases grandilocuentes y repetitivas.
-    15. Sé concreto, da siempre información clara sobre el quién, cómo, cuándo y cuánto. El corrector valora mucho que se sea concreto y claro en la propuesta. Específica clarmente la propuesta con pulcridad para que el redactor no entre en ambiguedades.
-    16. Evita la redacción uniforme con frases muy largas, estructuradas y sobre todo con la repetición de conceptos. Evita el exceso de adjetivos y palabras muy cantosas típicas de textos generados o revisados con IA.
-    17. No repitas la misma idea con palabras diferentes en apartados distintos. Intenta ser muy concreto en cada apartado y diferenciarte de los anteriores. No suenes redundante y trata de ser concreto y claro en cada apartado nuevo, manteniendo la coherencia con lo anterior pero evitando repetirte.
-    18. No comiences los párrafos de los subapartados mencionando el nombre de la empresa y su compromiso con no se que "DPI Estrategia, en su compromiso con la transparencia y la rendición de cuentas, elaborará y entregará una memoria final completa al término de los doce meses del programa.". Usa mejor una introducción más limpia que no mencione el nombre de la empresa y que diga "A modo de cerrar el servicio, se cerrará con una memoria final. Esta memoria final incluirá...".
-    19. No menciones el nombre de la empresa que se presenta a la licitación todo el rato. Ya se sabe que es la empresa, no hace falta ponerlo tan repetidamente.
-    20. NO PONGAS NUNCA los títulos las primeras letras de las palabras en mayusculas. Es decir si la frase es "El Enfoque Nativo en la Nube y la IA" ponlo así "El enfoque nativo en la nube y la IA". Cuida mucho eso en tu redacción es fundamental.
-    21. ESTÁ PROHIBIDO GENERAR PROMPTS QUE INCLUYAN INSTRUCCIONES O MARCADORES DE POSICIÓN como '[Completa aquí]' o '[Ajusta la tabla]'. El prompt debe contener toda la información para que el redactor final genere el texto completo, no para que le dé instrucciones.
+Cuando un prompt te pida resumir puntos clave, ventajas, fases o pilares, TIENES DOS OPCIONES para crear un elemento visual HTML. Elige la que mejor se adapte al contenido:
+
+OPCIÓN A: PLANTILLA DE LISTA SIMPLE (Para listas verticales y sencillas)
+Úsala para enumerar características o puntos de forma clara y directa.
+```html
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visual Element</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Urbanist:wght@400;600;700&display=swap');
+        body { font-family: 'Urbanist', sans-serif; background-color: #f0f2f5; display: flex; justify-content: center; align-items: center; padding: 20px; width: 800px; box-sizing: border-box; }
+        .card { background-color: white; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); padding: 25px; width: 100%; max-width: 750px; border-top: 5px solid #0046C6; }
+        h2 { color: #0046C6; text-align: center; margin-top: 0; font-size: 24px; font-weight: 700; }
+        ul { list-style-type: none; padding: 0; }
+        li { display: flex; align-items: center; margin-bottom: 15px; font-size: 16px; color: #333; }
+        li::before { content: '✔'; color: #32CFAA; font-size: 20px; font-weight: bold; margin-right: 15px; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2><!-- TÍTULO AQUÍ --></h2>
+        <ul>
+            <!-- LISTA DE ELEMENTOS AQUÍ (usa <li>Elemento 1</li>) -->
+        </ul>
+    </div>
+</body>
+</html>
+
+OPCIÓN B: PLANTILLA DE INFOGRAFÍA MULTI-COLUMNA (Para conceptos complejos y visualmente atractivos)
+Úsala para representar pilares, ejes, claves o fases de forma más dinámica, similar al ejemplo de "Claves del Asesoramiento".
+code
+Html
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Infographic Element</title>
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Urbanist:wght@400;600;700&display=swap');
+    body { font-family: 'Urbanist', sans-serif; display: flex; justify-content: center; align-items: center; padding: 20px; background-color: #f8f9fa; width: 800px; box-sizing: border-box; }
+    .container { background-color: #ffffff; border: 2px dashed #e0e0e0; border-radius: 15px; padding: 25px; width: 100%; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+    h2 { color: #0046C6; text-align: center; font-size: 26px; font-weight: 700; margin-bottom: 25px; letter-spacing: -0.5px; }
+    .columns { display: flex; justify-content: space-around; gap: 20px; }
+    .column { flex: 1; text-align: center; padding: 15px; border-top: 4px solid; border-radius: 8px; background-color: #fdfdfd; }
+    .column-icon { width: 30px; height: 30px; border-radius: 50%; margin: 0 auto 15px auto; }
+    .column h3 { font-size: 16px; font-weight: 600; color: #333; margin-bottom: 10px; }
+    .column ul { list-style: none; padding: 0; margin: 0; text-align: left; }
+    .column li { font-size: 13px; color: #555; margin-bottom: 8px; line-height: 1.5; }
+    /* Colores para las columnas y los iconos */
+    .color-1 { border-color: #FBC02D; } .icon-1 { background-color: #FBC02D; }
+    .color-2 { border-color: #4CAF50; } .icon-2 { background-color: #4CAF50; }
+    .color-3 { border-color: #90CAF9; } .icon-3 { background-color: #90CAF9; }
+    .color-4 { border-color: #F44336; } .icon-4 { background-color: #F44336; }
+</style>
+</head>
+<body>
+<div class="container">
+    <h2><!-- TÍTULO PRINCIPAL AQUÍ --></h2>
+    <div class="columns">
+        <div class="column color-1">
+            <div class="column-icon icon-1"></div>
+            <h3><!-- Título Columna 1 --></h3>
+            <ul>
+                <li><!-- Punto 1 Columna 1 --></li>
+                <li><!-- Punto 2 Columna 1 --></li>
+            </ul>
+        </div>
+        <div class="column color-2">
+            <div class="column-icon icon-2"></div>
+            <h3><!-- Título Columna 2 --></h3>
+            <ul>
+                <li><!-- Punto 1 Columna 2 --></li>
+                <li><!-- Punto 2 Columna 2 --></li>
+            </ul>
+        </div>
+        <div class="column color-3">
+            <div class="column-icon icon-3"></div>
+            <h3><!-- Título Columna 3 --></h3>
+            <ul>
+                <li><!-- Punto 1 Columna 3 --></li>
+                <li><!-- Punto 2 Columna 3 --></li>
+            </ul>
+        </div>
+        <div class="column color-4">
+            <div class="column-icon icon-4"></div>
+            <h3><!-- Título Columna 4 --></h3>
+            <ul>
+                <li><!-- Punto 1 Columna 4 --></li>
+                <li><!-- Punto 2 Columna 4 --></li>
+            </ul>
+        </div>
+    </div>
+</div>
+</body>
+</html>
+
+    10. Debes cumplir todos los criterios pero sin mencionar que tu objetivo es cumplirlos. Es decir, debes hacer lo que se valora pero sin decir que esa sección existe para cumplir con un criterio. La redacción y el parafraseo debe ser muy elegante para demostrar un dominio y cumplimiento de los objetivos sin sonar pesado.
+    11. No uses recursos como el ;, los : y ese tipo de expresiones que parecen hechas con IA. Tampoco uses expresiones precedidas por -. Debes prafasear mucho. Tu texto debe parecer natural sin perder la profesionalidad.
+    12. Debes establecer el mismo idioma para todas las redacciones. Este idioma debe ser el castellano.
+    13. Debes poner mucho detalle en los cronogramas. Detalla bien las fases y bájalo a semanas. En las actividades detalla bien cuánto tiempo llevan y qué se va a hacer en cada una de ellas. Especifica detalladamente las actividades o los objetos de contratación propuestos para que se vean como un plan de acción más que como algo teórico, que el que evalúa el contenido pueda ver claramente qué es exactamente lo que se va a hacer o ofrecer.
+    14. Si se habla de KPIs de evaluación, propón unos realistas y que estén relacionados con la empresa. Explica porqué esos indicadores, en qué consistirán y cómo se utilizarán para evaluar el desempeño. Hazlo desde un marco que no comprometa a la empresa (es decir que sean realistas) y que de una imagen de profesionalidad al evaluador.
+    15. No puedes mencionar las cualidades y atributos de la empresa cada dos por tres. Debes evitar el exceso de retórica, repetición continua de “metodología validada en mas de 1000 proyectos”, “índice de satisfacción 9.6”, “aliado estratégico...”. Eso suena a texto estandar y no convence. Debes ser directo, pulcro y evitar el meter contenido que no aporte valor. Evita frases grandilocuentes y repetitivas.
+    16. Sé concreto, da siempre información clara sobre el quién, cómo, cuándo y cuánto. El corrector valora mucho que se sea concreto y claro en la propuesta. Específica clarmente la propuesta con pulcridad para que el redactor no entre en ambiguedades.
+    17. Evita la redacción uniforme con frases muy largas, estructuradas y sobre todo con la repetición de conceptos. Evita el exceso de adjetivos y palabras muy cantosas típicas de textos generados o revisados con IA.
+    18. No repitas la misma idea con palabras diferentes en apartados distintos. Intenta ser muy concreto en cada apartado y diferenciarte de los anteriores. No suenes redundante y trata de ser concreto y claro en cada apartado nuevo, manteniendo la coherencia con lo anterior pero evitando repetirte.
+    19. No comiences los párrafos de los subapartados mencionando el nombre de la empresa y su compromiso con no se que "DPI Estrategia, en su compromiso con la transparencia y la rendición de cuentas, elaborará y entregará una memoria final completa al término de los doce meses del programa.". Usa mejor una introducción más limpia que no mencione el nombre de la empresa y que diga "A modo de cerrar el servicio, se cerrará con una memoria final. Esta memoria final incluirá...".
+    20. No menciones el nombre de la empresa que se presenta a la licitación todo el rato. Ya se sabe que es la empresa, no hace falta ponerlo tan repetidamente.
+    21. NO PONGAS NUNCA los títulos las primeras letras de las palabras en mayusculas. Es decir si la frase es "El Enfoque Nativo en la Nube y la IA" ponlo así "El enfoque nativo en la nube y la IA". Cuida mucho eso en tu redacción es fundamental.
+    22. ESTÁ PROHIBIDO GENERAR PROMPTS QUE INCLUYAN INSTRUCCIONES O MARCADORES DE POSICIÓN como '[Completa aquí]' o '[Ajusta la tabla]'. El prompt debe contener toda la información para que el redactor final genere el texto completo, no para que le dé instrucciones.
     22. **REGLA FINAL Y ABSOLUTA:** Tu única salida debe ser el contenido solicitado. Si se te pide Markdown, genera SÓLO Markdown. Si se te pide un elemento visual HTML, genera SÓLO el código `<!DOCTYPE html>...</html>`. No incluyas NINGUNA palabra de explicación, análisis, saludo, comentario o contexto sobre lo que has generado. Tu respuesta debe ser pura y directa.
 
     Estructura obligatoria para cada prompt: Cada prompt debe comenzar indicando con claridad qué apartado se va a redactar y cuál es el objetivo específico de ese apartado dentro de la memoria. A continuación, debe definir el rango o número aproximado de palabras que debe ocupar el texto. Seguidamente, se incluirá una explicación de contexto general de la dictación, detallando todos los puntos y requisitos que se deben cubrir en ese apartado. Después, se aportará un contexto concreto de la empresa, para cumplir esos requisitos presentando la propuesta de la empresa totalmente personalizada a sus fortalezas . Finalmente, el prompt debe cerrar con una lista de matices o consideraciones importantes para la redacción (tono, estilo, prohibiciones, obligatoriedades, etc.) las cuáles hemos pautado anteriormente cuando mencionamos las reglas, que sirvan como guía de calidad y eviten errores habituales.
