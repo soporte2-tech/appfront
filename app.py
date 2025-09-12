@@ -1739,46 +1739,29 @@ def phase_4_page(model):
                 if respuesta_ia is None:
                     st.error(f"Fallo definitivo al generar tarea {i+1}."); continue
 
-                # =================== ¡INICIO DE LA LÓGICA DEFINITIVA Y CORREGIDA! ===================
-                # Buscamos si la respuesta contiene un bloque HTML completo.
                 match_html = re.search(r'(<!DOCTYPE html>.*</html>)', respuesta_ia, re.DOTALL)
 
                 if match_html:
-                    # CASO 1: Se encontró un elemento visual HTML.
-                    
-                    # 1a. Extraemos el bloque de HTML puro.
                     html_puro = match_html.group(1)
-                    
-                    # 1b. Extraemos y añadimos al Word ÚNICAMENTE el texto que venía ANTES del HTML.
                     texto_previo = respuesta_ia[:match_html.start()].strip()
                     if texto_previo:
                         agregar_markdown_a_word(documento, texto_previo)
                         
-                    # 1c. Generamos la imagen desde el HTML puro.
-                    html_completo = wrap_html_fragment(html_puro) # Asegura que sea un doc completo
+                    html_completo = wrap_html_fragment(html_puro)
                     nombre_img = f"temp_img_{i}.png"
                     image_file = html_a_imagen(html_completo, output_filename=nombre_img)
                     
-                    # 1d. Insertamos la imagen en el Word.
                     if image_file and os.path.exists(image_file):
                         try:
                             documento.add_picture(image_file, width=docx.shared.Inches(6.5))
-                            os.remove(image_file) # Limpiamos el archivo temporal
+                            os.remove(image_file)
                         except Exception as e:
                             st.error(f"Error al añadir imagen al DOCX: {e}")
                             documento.add_paragraph(f"[ERROR AL INSERTAR IMAGEN]")
                     else:
                         documento.add_paragraph(f"[ERROR AL RENDERIZAR IMAGEN]")
-                        
-                    # 1e. ¡CRUCIAL! IGNORAMOS COMPLETAMENTE CUALQUIER TEXTO que venga después del HTML.
-                    # Esto descarta los "Puntos fuertes", "Sugerencias", etc.
-                    # No se necesita código aquí, simplemente no procesamos el resto de la cadena.
-
                 else:
-                    # CASO 2: No se encontró ningún bloque HTML.
-                    # Tratamos toda la respuesta como texto Markdown normal.
                     agregar_markdown_a_word(documento, respuesta_ia)
-                # =================== ¡FIN DE LA LÓGICA DEFINITIVA Y CORREGIDA! ===================
 
             # --- GUARDADO Y ALMACENAMIENTO EN SESIÓN ---
             progress_bar.progress(1.0, text="Ensamblando documento final...")
@@ -1793,7 +1776,6 @@ def phase_4_page(model):
             st.session_state.generated_doc_buffer = doc_io
             st.session_state.generated_doc_filename = nombre_archivo_final
             
-            # Subir a Drive
             with st.spinner("Guardando documento final en Google Drive..."):
                 try:
                     word_file_obj = io.BytesIO(doc_io.getvalue())
@@ -1822,55 +1804,32 @@ def phase_4_page(model):
     # --- NAVEGACIÓN ---
     st.markdown("---")
     st.button("← Volver a Fase 3", on_click=go_to_phase3, use_container_width=True)
-    
+
 # =============================================================================
-#                        LÓGICA PRINCIPAL (ROUTER) - VERSIÓN CORREGIDA
+#                        LÓGICA PRINCIPAL (ROUTER)
 # =============================================================================
 
-# Primero, SIEMPRE comprobamos si tenemos credenciales de usuario.
 credentials = get_credentials()
 
-# Si NO hay credenciales, el usuario no ha iniciado sesión.
 if not credentials:
-    # La única página que puede ver es la de bienvenida para que inicie sesión.
     landing_page()
-
-# Si SÍ hay credenciales, el usuario ya ha iniciado sesión.
 else:
-    # --- !! INICIO DE LA CORRECCIÓN !! ---
-    # Configurar la API de Gemini y crear el modelo una sola vez aquí.
-    # Así estará disponible para todas las páginas.
     try:
         genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-        # Asegúrate de que tienes una secret llamada "GEMINI_API_KEY" en Streamlit Cloud
         model = genai.GenerativeModel('gemini-1.5-pro-latest') 
     except Exception as e:
         st.error(f"Error al configurar la API de Gemini. Verifica tu 'GEMINI_API_KEY' en los secrets. Detalle: {e}")
         st.stop()
-    # --- FIN DE LA CORRECCIÓN ---
 
-    # Ahora que sabemos que está dentro, miramos en qué página quiere estar.
-    # Si acaba de iniciar sesión, su 'page' será 'landing', así que lo llevamos
-    # a la selección de proyectos.
     if st.session_state.page == 'landing' or st.session_state.page == 'project_selection':
         project_selection_page()
-    
     elif st.session_state.page == 'phase_1':
-        # Pasamos el objeto 'model' a la función de la página
         phase_1_page(model)
-        
     elif st.session_state.page == 'phase_1_results':
-        # Pasamos el objeto 'model' a la función de la página
         phase_1_results_page(model)
-
     elif st.session_state.page == 'phase_2':
-        # Pasamos el objeto 'model' a la función de la página
         phase_2_page(model)
-
     elif st.session_state.page == 'phase_3':
-        # Pasamos el objeto 'model' a la función de la página
         phase_3_page(model)
-        
-    elif st.session_state.page == 'phase_4': # <-- AÑADE ESTE BLOQUE
-        # Pasamos el objeto 'model' a la función de la página
+    elif st.session_state.page == 'phase_4':
         phase_4_page(model)
