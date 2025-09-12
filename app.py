@@ -1631,125 +1631,18 @@ def phase_4_page(model):
             documento = docx.Document()
             chat_redaccion = model.start_chat()
             
-            # (El resto de la lógica de inicialización del chat y bucle se mantiene igual)
-            # ...
-            # AQUÍ VIENE EL CAMBIO CLAVE DENTRO DEL BUCLE
-            
             ultimo_apartado_escrito, ultimo_subapartado_escrito = "", ""
             total_prompts = len(lista_de_prompts)
             
             for i, tarea in enumerate(lista_de_prompts):
-                # ... (código para actualizar la barra de progreso y obtener el prompt) ...
                 progress_text = f"Procesando Tarea {i+1}/{total_prompts} (ID: {tarea.get('prompt_id', 'N/A')})"
                 progress_bar.progress((i + 1) / total_prompts, text=progress_text)
                 prompt_actual = tarea.get("prompt_para_asistente")
                 if not prompt_actual: continue
 
-                # ... (código para añadir títulos de apartado/subapartado) ...
                 apartado_actual = tarea.get("apartado_referencia", "Sin Apartado")
                 subapartado_actual = tarea.get("subapartado_referencia", "Sin Subapartado")
-                if apartado_actual != ultimo_apartado_escrito:
-                    if ultimo_apartado_escrito != "": documento.add_page_break()
-                    documento.add_heading(apartado_actual, level=1)
-                    ultimo_apartado_escrito = apartado_actual; ultimo_subapartado_escrito = ""
-                if subapartado_actual and subapartado_actual != ultimo_subapartado_escrito:
-                    documento.add_heading(subapartado_actual, level=2)
-                    ultimo_subapartado_escrito = subapartado_actual
-
-                # ... (código para llamar a la IA con reintentos) ...
-                respuesta_ia = None
-                for attempt in range(3):
-                    try:
-                        response = chat_redaccion.send_message(prompt_actual)
-                        respuesta_ia = response.text.strip(); time.sleep(1); break
-                    except Exception as e:
-                        st.warning(f"Intento {attempt + 1} fallido: {e}. Reintentando..."); time.sleep(5)
-                
-                if respuesta_ia is None:
-                    st.error(f"Fallo definitivo al generar tarea {i+1}."); continue
-
-# =================== ¡AQUÍ ESTÁ LA NUEVA LÓGICA MEJORADA! ===================
-# Usamos una expresión regular para buscar un bloque HTML completo en la respuesta.
-# re.DOTALL es crucial para que '.' también coincida con saltos de línea.
-match_html = re.search(r'(<!DOCTYPE html>.*</html>)', respuesta_ia, re.DOTALL)
-
-if match_html:
-    # Si encontramos una coincidencia, extraemos SOLO el bloque HTML.
-    html_puro = match_html.group(1)
-    
-    # Opcional pero recomendado: Añadimos al Word el texto que venía ANTES del HTML.
-    texto_previo = respuesta_ia[:match_html.start()].strip()
-    if texto_previo:
-        agregar_markdown_a_word(documento, texto_previo)
-        
-    # Ahora generamos la imagen desde el HTML puro.
-    html_completo = wrap_html_fragment(html_puro) # wrap_html_fragment es seguro, si ya es completo lo deja igual
-    nombre_img = f"temp_img_{i}.png"
-    image_file = html_a_imagen(html_completo, output_filename=nombre_img)
-    
-    if image_file and os.path.exists(image_file):
-        try:
-            documento.add_picture(image_file, width=docx.shared.Inches(6.5))
-            os.remove(image_file)
-        except Exception as e:
-            st.error(f"Error al añadir imagen al DOCX: {e}")
-            documento.add_paragraph(f"[ERROR AL INSERTAR IMAGEN]")
-    else:
-        documento.add_paragraph(f"[ERROR AL RENDERIZAR IMAGEN]")
-        
-    # Opcional: Añadimos el texto que venía DESPUÉS del HTML.
-    texto_posterior = respuesta_ia[match_html.end():].strip()
-    if texto_posterior:
-        agregar_markdown_a_word(documento, texto_posterior)
-
-else:
-    # Si no se encontró ningún bloque HTML, tratamos toda la respuesta como Markdown.
-    agregar_markdown_a_word(documento, respuesta_ia)
-# =========================================================================
-                # =================================================================
-
-            # --- GUARDADO Y ALMACENAMIENTO EN SESIÓN ---
-            progress_bar.progress(1.0, text="Ensamblando documento final...")
-            
-            project_name = st.session_state.selected_project['name']
-            safe_project_name = re.sub(r'[\\/*?:"<>|]', "", project_name).replace(' ', '_')
-            nombre_archivo_final = f"Memoria_Tecnica_{safe_project_name}.docx"
-            doc_io = io.BytesIO()
-            documento.save(doc_io)
-            doc_io.seek(0)
-            
-            st.session_state.generated_doc_buffer = doc_io
-            st.session_state.generated_doc_filename = nombre_archivo_final
-            
-            # Subir a Drive
-            with st.spinner("Guardando documento final en Google Drive..."):
-                try:
-                    word_file_obj = io.BytesIO(doc_io.getvalue())
-                    word_file_obj.name = nombre_archivo_final
-                    word_file_obj.type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                    old_file_id = find_file_by_name(service, nombre_archivo_final, docs_app_folder_id)
-                    if old_file_id: delete_file_from_drive(service, old_file_id)
-                    upload_file_to_drive(service, word_file_obj, docs_app_folder_id)
-                    st.toast(f"¡'{nombre_archivo_final}' guardado en Drive!")
-                except Exception as e:
-                    st.error(f"Error al guardar en Drive: {e}")
-            st.rerun() # Recargamos para mostrar la sección de descarga
-
-    # --- SECCIÓN DE RESULTADOS Y DESCARGA ---
-    if st.session_state.generated_doc_buffer:
-        st.balloons()
-        st.success("¡Tu documento está listo!")
-        st.download_button(
-            label="🎉 Descargar Memoria Técnica Final (.docx)",
-            data=st.session_state.generated_doc_buffer,
-            file_name=st.session_state.generated_doc_filename,
-            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            use_container_width=True
-        )
-
-    # --- NAVEGACIÓN ---
-    st.markdown("---")
-    st.button("← Volver a Fase 3", on_click=go_to_phase3, use_container_width=True)
+                if apartado_
     
 # =============================================================================
 #                        LÓGICA PRINCIPAL (ROUTER) - VERSIÓN CORREGIDA
