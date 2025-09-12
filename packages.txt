@@ -1,3 +1,3 @@
 wkhtmltopdf
 libxrender1
-fonts-ubuntu  # <-- Añade esta línea para mejorar la compatibilidad de fuentes
+fonts-ubuntu
