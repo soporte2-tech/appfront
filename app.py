@@ -461,6 +461,8 @@ Genera únicamente el objeto JSON corregido. No incluyas ningún texto fuera de 
 """
 
 PROMPT_DESARROLLO = """
+     **ATENCIÓN: REGLA CRÍTICA Y NO NEGOCIABLE**
+    Tu única salida es el contenido final solicitado (texto en Markdown o un único bloque de código HTML). ESTÁ ABSOLUTAMENTE PROHIBIDO generar cualquier texto que analice, comente o critique tu propia salida. Frases como "Este código HTML...", "Puntos fuertes:", "Sugerencias:", "Con estas mejoras..." resultarán en un fallo inmediato. Debes actuar como el redactor final, no como un revisor de código.
     Actúa como un consultor experto redactando una memoria técnica para una licitación pública. Debes hacer una memoria técnica seria, pero amena de leer con algunos (sin excederse) elementos gráficos, tablas y listas que hagan la lectura más fácil y profesional.
     Tu tarea es crear los prompts que darán forma al texto de este subapartado. Es por ello que debes que tener en cuenta que estas indicaciones
     deben tener todo tipo de detalles para que otra IA sea capaz de con ese contexto recibirlo y generar el contenido final de la mejor manera posible.
@@ -1616,6 +1618,20 @@ def phase_3_page(model):
 #           FASE 4 - REDACCIÓN Y ENSAMBLAJE FINAL
 # =============================================================================
 
+import re
+import io
+import os
+import time
+import docx
+import json
+import streamlit as st
+from pypdf import PdfReader # Asegúrate de que esta importación esté al principio de tu script
+import imgkit # Y esta también
+
+# =============================================================================
+#           FASE 4 - REDACCIÓN Y ENSAMBLAJE FINAL (VERSIÓN CORREGIDA)
+# =============================================================================
+
 def phase_4_page(model):
     """Página para ejecutar el plan de prompts y generar el documento Word final."""
     st.markdown("<h3>FASE 4: Redacción y Ensamblaje Final</h3>", unsafe_allow_html=True)
@@ -1692,39 +1708,46 @@ def phase_4_page(model):
                 if respuesta_ia is None:
                     st.error(f"Fallo definitivo al generar tarea {i+1}."); continue
 
-                # =================== ¡INICIO DE LA LÓGICA DEFINITIVA! ===================
+                # =================== ¡INICIO DE LA LÓGICA DEFINITIVA Y CORREGIDA! ===================
+                # Buscamos si la respuesta contiene un bloque HTML completo.
                 match_html = re.search(r'(<!DOCTYPE html>.*</html>)', respuesta_ia, re.DOTALL)
 
                 if match_html:
+                    # CASO 1: Se encontró un elemento visual HTML.
+                    
+                    # 1a. Extraemos el bloque de HTML puro.
                     html_puro = match_html.group(1)
                     
-                    # Añadimos al Word ÚNICAMENTE el texto que venía ANTES del HTML.
+                    # 1b. Extraemos y añadimos al Word ÚNICAMENTE el texto que venía ANTES del HTML.
                     texto_previo = respuesta_ia[:match_html.start()].strip()
                     if texto_previo:
                         agregar_markdown_a_word(documento, texto_previo)
                         
-                    # Ahora generamos la imagen desde el HTML puro.
-                    html_completo = wrap_html_fragment(html_puro)
+                    # 1c. Generamos la imagen desde el HTML puro.
+                    html_completo = wrap_html_fragment(html_puro) # Asegura que sea un doc completo
                     nombre_img = f"temp_img_{i}.png"
                     image_file = html_a_imagen(html_completo, output_filename=nombre_img)
                     
+                    # 1d. Insertamos la imagen en el Word.
                     if image_file and os.path.exists(image_file):
                         try:
                             documento.add_picture(image_file, width=docx.shared.Inches(6.5))
-                            os.remove(image_file)
+                            os.remove(image_file) # Limpiamos el archivo temporal
                         except Exception as e:
                             st.error(f"Error al añadir imagen al DOCX: {e}")
                             documento.add_paragraph(f"[ERROR AL INSERTAR IMAGEN]")
                     else:
                         documento.add_paragraph(f"[ERROR AL RENDERIZAR IMAGEN]")
                         
-                    # LA LÍNEA CLAVE ES QUE YA NO PROCESAMOS EL "texto_posterior".
-                    # Lo ignoramos por completo.
+                    # 1e. ¡CRUCIAL! IGNORAMOS COMPLETAMENTE CUALQUIER TEXTO que venga después del HTML.
+                    # Esto descarta los "Puntos fuertes", "Sugerencias", etc.
+                    # No se necesita código aquí, simplemente no procesamos el resto de la cadena.
 
                 else:
-                    # Si no se encontró ningún bloque HTML, tratamos toda la respuesta como Markdown.
+                    # CASO 2: No se encontró ningún bloque HTML.
+                    # Tratamos toda la respuesta como texto Markdown normal.
                     agregar_markdown_a_word(documento, respuesta_ia)
-                # =================== ¡FIN DE LA LÓGICA DEFINITIVA! ===================
+                # =================== ¡FIN DE LA LÓGICA DEFINITIVA Y CORREGIDA! ===================
 
             # --- GUARDADO Y ALMACENAMIENTO EN SESIÓN ---
             progress_bar.progress(1.0, text="Ensamblando documento final...")
