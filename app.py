@@ -1653,16 +1653,18 @@ def phase_4_page(model):
                 if respuesta_ia is None:
                     st.error(f"Fallo definitivo al generar tarea {i+1}."); continue
 
-                # =================== ¡INICIO DE LA LÓGICA CORREGIDA! ===================
+                # =================== ¡INICIO DE LA LÓGICA DEFINITIVA! ===================
                 match_html = re.search(r'(<!DOCTYPE html>.*</html>)', respuesta_ia, re.DOTALL)
 
                 if match_html:
                     html_puro = match_html.group(1)
                     
+                    # Añadimos al Word ÚNICAMENTE el texto que venía ANTES del HTML.
                     texto_previo = respuesta_ia[:match_html.start()].strip()
                     if texto_previo:
                         agregar_markdown_a_word(documento, texto_previo)
                         
+                    # Ahora generamos la imagen desde el HTML puro.
                     html_completo = wrap_html_fragment(html_puro)
                     nombre_img = f"temp_img_{i}.png"
                     image_file = html_a_imagen(html_completo, output_filename=nombre_img)
@@ -1677,13 +1679,13 @@ def phase_4_page(model):
                     else:
                         documento.add_paragraph(f"[ERROR AL RENDERIZAR IMAGEN]")
                         
-                    texto_posterior = respuesta_ia[match_html.end():].strip()
-                    if texto_posterior:
-                        agregar_markdown_a_word(documento, texto_posterior)
+                    # LA LÍNEA CLAVE ES QUE YA NO PROCESAMOS EL "texto_posterior".
+                    # Lo ignoramos por completo.
 
                 else:
+                    # Si no se encontró ningún bloque HTML, tratamos toda la respuesta como Markdown.
                     agregar_markdown_a_word(documento, respuesta_ia)
-                # =================== ¡FIN DE LA LÓGICA CORREGIDA! ===================
+                # =================== ¡FIN DE LA LÓGICA DEFINITIVA! ===================
 
             # --- GUARDADO Y ALMACENAMIENTO EN SESIÓN ---
             progress_bar.progress(1.0, text="Ensamblando documento final...")
