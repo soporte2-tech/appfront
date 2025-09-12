@@ -463,14 +463,11 @@ Genera únicamente el objeto JSON corregido. No incluyas ningún texto fuera de 
 PROMPT_DESARROLLO = """
     **ATENCIÓN: REGLA CRÍTICA Y NO NEGOCIABLE**
     Tu única salida es el contenido final solicitado (texto en Markdown o un único bloque de código HTML). ESTÁ ABSOLUTAMENTE PROHIBIDO generar cualquier texto que analice, comente o critique tu propia salida. Frases como "Este código HTML...", "Puntos fuertes:", "Sugerencias:", "Con estas mejoras..." resultarán en un fallo inmediato. Debes actuar como el redactor final, no como un revisor de código.
-
     Actúa como un consultor experto redactando una memoria técnica para una licitación pública. Debes hacer una memoria técnica seria, pero amena de leer con algunos (sin excederse) elementos gráficos, tablas y listas que hagan la lectura más fácil y profesional.
     Tu tarea es crear los prompts que darán forma al texto de este subapartado. Es por ello que debes que tener en cuenta que estas indicaciones
     deben tener todo tipo de detalles para que otra IA sea capaz de con ese contexto recibirlo y generar el contenido final de la mejor manera posible.
     Debes ser un buen guía para que la IA no cometa errores de escritura y realice un buen trabajo.
     Debes seguir estos pasos para hacer estos prompts:
-
-
     1. Tu objetivo es crear UN SOLO prompt para el subapartado completo que se te ha asignado. No lo dividas en múltiples prompts. Define un rango de palabras coherente para que el redactor final sepa la longitud esperada.
     2. Dentro de ese único prompt, detalla todo el contexto y los puntos clave que el redactor debe cubrir, basándote en la información de los Pliegos y los guiones. Sé exhaustivo en las instrucciones.
     3. Una vez ya sabes cuántas palabras tendrán los prompts, complementa el contenido de cada prompt con el CONTEXTO ADICIONAL que te proporciono. Este contexto incluye el guion borrador ya creado y la documentación de apoyo. Úsalo como base principal para dar forma a la propuesta de contenido.Intenta siempre usar un contenidio de la empresa real, pero si en la documentación o el mensaje inicial que se te dió no hay nada para llegar a ese objetivo.
@@ -484,9 +481,7 @@ PROMPT_DESARROLLO = """
     10.  **SALIDA DIRECTA Y PURA:** Si se pide texto, genera solo el texto. Si se pide un elemento visual HTML, genera solo el código HTML. No añadas introducciones ni conclusiones a menos que el prompt específico lo pida.
     11.  **TONO Y ESTILO:** Mantén un tono profesional, impersonal (tercera persona), concreto y alineado con los pliegos, aplicando todas las reglas de estilo (no repetir ideas, ser concreto, etc.) que ya conoces.
 HERRAMIENTAS VISUALES A TU DISPOSICIÓN:
-
 Cuando un prompt te pida resumir puntos clave, ventajas, fases o pilares, TIENES DOS OPCIONES para crear un elemento visual HTML. Elige la que mejor se adapte al contenido:
-
 OPCIÓN A: PLANTILLA DE LISTA SIMPLE (Para listas verticales y sencillas)
 Úsala para enumerar características o puntos de forma clara y directa.
 ```html
@@ -517,8 +512,6 @@ OPCIÓN A: PLANTILLA DE LISTA SIMPLE (Para listas verticales y sencillas)
 </html>
 OPCIÓN B: PLANTILLA DE INFOGRAFÍA MULTI-COLUMNA (Para conceptos complejos y visualmente atractivos)
 Úsala para representar pilares, ejes, claves o fases de forma más dinámica, similar al ejemplo de "Claves del Asesoramiento".
-code
-Html
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -583,8 +576,6 @@ Html
 </div>
 </body>
 </html>
-code
-Code
 10. Debes cumplir todos los criterios pero sin mencionar que tu objetivo es cumplirlos. Es decir, debes hacer lo que se valora pero sin decir que esa sección existe para cumplir con un criterio. La redacción y el parafraseo debe ser muy elegante para demostrar un dominio y cumplimiento de los objetivos sin sonar pesado.
 11. No uses recursos como el ;, los : y ese tipo de expresiones que parecen hechas con IA. Tampoco uses expresiones precedidas por -. Debes prafasear mucho. Tu texto debe parecer natural sin perder la profesionalidad.
 12. Debes establecer el mismo idioma para todas las redacciones. Este idioma debe ser el castellano.
@@ -599,49 +590,31 @@ Code
 21. NO PONGAS NUNCA los títulos las primeras letras de las palabras en mayusculas. Es decir si la frase es "El Enfoque Nativo en la Nube y la IA" ponlo así "El enfoque nativo en la nube y la IA". Cuida mucho eso en tu redacción es fundamental.
 22. ESTÁ PROHIBIDO GENERAR PROMPTS QUE INCLUYAN INSTRUCCIONES O MARCADORES DE POSICIÓN como '[Completa aquí]' o '[Ajusta la tabla]'. El prompt debe contener toda la información para que el redactor final genere el texto completo, no para que le dé instrucciones.
 22. **REGLA FINAL Y ABSOLUTA:** Tu única salida debe ser el contenido solicitado. Si se te pide Markdown, genera SÓLO Markdown. Si se te pide un elemento visual HTML, genera SÓLO el código `<!DOCTYPE html>...</html>`. No incluyas NINGUNA palabra de explicación, análisis, saludo, comentario o contexto sobre lo que has generado. Tu respuesta debe ser pura y directa.
-
 Estructura obligatoria para cada prompt: Cada prompt debe comenzar indicando con claridad qué apartado se va a redactar y cuál es el objetivo específico de ese apartado dentro de la memoria. A continuación, debe definir el rango o número aproximado de palabras que debe ocupar el texto. Seguidamente, se incluirá una explicación de contexto general de la dictación, detallando todos los puntos y requisitos que se deben cubrir en ese apartado. Después, se aportará un contexto concreto de la empresa, para cumplir esos requisitos presentando la propuesta de la empresa totalmente personalizada a sus fortalezas . Finalmente, el prompt debe cerrar con una lista de matices o consideraciones importantes para la redacción (tono, estilo, prohibiciones, obligatoriedades, etc.) las cuáles hemos pautado anteriormente cuando mencionamos las reglas, que sirvan como guía de calidad y eviten errores habituales.
-
-
 Si un apartado es "Índice", apartados que posean un 0 delante o algo análogo, evita ese apartado y no crees un prompt para ese caso. No hay que redactar nada en ese caso y por lo tanto no nos interesa.
 Debes seguir las intrucciones de contexto general que se te han dado al comienzo de esta conversación para que el docuemnto esté alineado a ello.
 Redacta el contenido de los prompts dentro del json en GitHub Flavored Markdown (gfm). Se pulcro con ello y pide que en la redacción también se use ese estilo.
 Es muy importante la calidad del contenido y lo visual que se muestre. Intenta meter muchas tablas, listas y elementos HTML que decoren y resuman el contenido. Debe ser visual y atractivo sin perder el toque profesional. Intenta no meter mucha paja ni contenido que no aporte nada de valor. Menos contenido, bien explicado y sin explicar los conceptos dos veces, céntrate en ir al grano y no dar vueltas.
-
-
 Este es el subapartado para el que debes redactar los prompts:
-
-
 - **Apartado Principal:** "{apartado_titulo}"
 - **Subapartado a Redactar:** "{subapartado_titulo}"
-
-
 Las instrucciones exactas de la plantilla para este subapartado son:
 - **Indicaciones (pueden venir vacías, en ese caso búscalas):** "{indicaciones}" (Complementalas y aumenta el contexto en tus instrucciones)
-
-
 **REGLAS DE SALIDA:**
 Tu respuesta DEBE ser SÓLO un único objeto JSON válido (sin ```json al principio ni ``` al final y sin ningún texto que lo acompañe), que contenga una única clave `"plan_de_prompts"` cuyo valor sea una lista de objetos. Cada objeto de la lista representa un prompt y debe seguir esta estructura exacta:
-
-
 {{{{
   "apartado_referencia": "El título del apartado principal que te he proporcionado (ej: 2. Solución Técnica Propuesta)",
   "subapartado_referencia": "El título del subapartado que te he proporcionado (ej: 2.1. Metodología de Trabajo)",
   "prompt_id": "Un identificador único para el prompt (ej: PROMPT_2_1_A)(Si es un HTML se debe agregar "HTML_VISUAL" al id (ej: PROMPT_2_1_1_HTML_VISUAL))",
   "prompt_para_asistente": "La pregunta o instrucción específica y detallada para el asistente (ej: )."
 }}}}
-
-
 Para redactar tu respuesta, DEBES utilizar la información de los archivos que tienes disponibles:
 1.  Consulta los **Pliegos** para entender y cumplir todos los requisitos técnicos y de puntuación mencionados en las indicaciones.
 2.  Consulta las **Memorias de ejemplo** para adoptar un tono, estilo y nivel de detalle similar. (Si aplica)
 3.  Consulta la **Doc. Empresa** para incorporar información específica de nuestra compañía (como nombres de tecnologías, proyectos pasados o certificaciones) si es relevante.
-
-
 **RESPUESTA EN ESPAÑOL SIEMPRE**
-
-
 Genera un texto profesional, bien estructurado y que responda directamente a las indicaciones. No añadas introducciones o conclusiones que no se pidan.
+"""
 
 # =============================================================================
 #              NUEVAS FUNCIONES: AUTENTICACIÓN Y GOOGLE DRIVE
