@@ -483,6 +483,7 @@ HERRAMIENTAS VISUALES A TU DISPOSICIÓN:
 OPCIÓN A: PLANTILLA DE LISTA SIMPLE
 ```html
 <!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Visual Element</title><style>@import url('https://fonts.googleapis.com/css2?family=Urbanist:wght@400;600;700&display=swap');body {{{{ font-family: 'Urbanist', sans-serif; background-color: #f0f2f5; display: flex; justify-content: center; align-items: center; padding: 20px; width: 800px; box-sizing: border-box; }}}} .card {{{{ background-color: white; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); padding: 25px; width: 100%; max-width: 750px; border-top: 5px solid #0046C6; }}}} h2 {{{{ color: #0046C6; text-align: center; margin-top: 0; font-size: 24px; font-weight: 700; }}}} ul {{{{ list-style-type: none; padding: 0; }}}} li {{{{ display: flex; align-items: center; margin-bottom: 15px; font-size: 16px; color: #333; }}}} li::before {{{{ content: '✔'; color: #32CFAA; font-size: 20px; font-weight: bold; margin-right: 15px; }}}}</style></head><body><div class="card"><h2><!-- TÍTULO AQUÍ --></h2><ul><!-- LISTA DE ELEMENTOS AQUÍ --></ul></div></body></html>
+OPCIÓN B: PLANTILLA DE INFOGRAFÍA MULTI-COLUMNA
 <!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Infographic Element</title><style>@import url('https://fonts.googleapis.com/css2?family=Urbanist:wght@400;600;700&display=swap');body {{{{ font-family: 'Urbanist', sans-serif; display: flex; justify-content: center; align-items: center; padding: 20px; background-color: #f8f9fa; width: 800px; box-sizing: border-box; }}}} .container {{{{ background-color: #ffffff; border: 2px dashed #e0e0e0; border-radius: 15px; padding: 25px; width: 100%; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }}}} h2 {{{{ color: #0046C6; text-align: center; font-size: 26px; font-weight: 700; margin-bottom: 25px; letter-spacing: -0.5px; }}}} .columns {{{{ display: flex; justify-content: space-around; gap: 20px; }}}} .column {{{{ flex: 1; text-align: center; padding: 15px; border-top: 4px solid; border-radius: 8px; background-color: #fdfdfd; }}}} .column-icon {{{{ width: 30px; height: 30px; border-radius: 50%; margin: 0 auto 15px auto; }}}} .column h3 {{{{ font-size: 16px; font-weight: 600; color: #333; margin-bottom: 10px; }}}} .column ul {{{{ list-style: none; padding: 0; margin: 0; text-align: left; }}}} .column li {{{{ font-size: 13px; color: #555; margin-bottom: 8px; line-height: 1.5; }}}} .color-1 {{{{ border-color: #FBC02D; }}}} .icon-1 {{{{ background-color: #FBC02D; }}}} .color-2 {{{{ border-color: #4CAF50; }}}} .icon-2 {{{{ background-color: #4CAF50; }}}} .color-3 {{{{ border-color: #90CAF9; }}}} .icon-3 {{{{ background-color: #90CAF9; }}}} .color-4 {{{{ border-color: #F44336; }}}} .icon-4 {{{{ background-color: #F44336; }}}}</style></head><body><div class="container"><h2><!-- TÍTULO --></h2><div class="columns"><div class="column color-1"><div class="column-icon icon-1"></div><h3><!-- Título Col 1 --></h3><ul><li><!-- Punto 1 --></li></ul></div><div class="column color-2"><div class="column-icon icon-2"></div><h3><!-- Título Col 2 --></h3><ul><li><!-- Punto 1 --></li></ul></div><div class="column color-3"><div class="column-icon icon-3"></div><h3><!-- Título Col 3 --></h3><ul><li><!-- Punto 1 --></li></ul></div></div></div></body></html>
 10. Debes cumplir todos los criterios pero sin mencionar que tu objetivo es cumplirlos. Es decir, debes hacer lo que se valora pero sin decir que esa sección existe para cumplir con un criterio. La redacción y el parafraseo debe ser muy elegante para demostrar un dominio y cumplimiento de los objetivos sin sonar pesado.
 11. No uses recursos como el ;, los : y ese tipo de expresiones que parecen hechas con IA. Tampoco uses expresiones precedidas por -. Debes prafasear mucho. Tu texto debe parecer natural sin perder la profesionalidad.
@@ -1591,8 +1592,7 @@ def phase_4_page(model):
         plan_de_accion = json.loads(json_bytes.decode('utf-8'))
         lista_de_prompts = plan_de_accion.get("plan_de_prompts", [])
         
-        # --- CORRECCIÓN 1: ORDENAR LA LISTA DE PROMPTS ---
-        # Esto garantiza que el documento se genere en el orden numérico correcto (1.1, 1.1.1, 1.2, 2.1, etc.)
+        # CORRECCIÓN 1: Ordenar la lista de prompts para garantizar el orden numérico
         lista_de_prompts.sort(key=lambda x: x.get('prompt_id', ''))
         
         st.success(f"✔️ Plan de acción cargado y ordenado. Se ejecutarán {len(lista_de_prompts)} prompts.")
@@ -1617,7 +1617,7 @@ def phase_4_page(model):
                 progress_text = f"Procesando Tarea {i+1}/{len(lista_de_prompts)}: {tarea.get('subapartado_referencia', 'N/A')}"
                 progress_bar.progress((i + 1) / len(lista_de_prompts), text=progress_text)
                 
-                # --- CORRECCIÓN 2: LÓGICA DE ENCABEZADOS MEJORADA ---
+                # CORRECCIÓN 2: Lógica de encabezados mejorada para evitar duplicados
                 apartado_actual = tarea.get("apartado_referencia", "Sin Apartado")
                 subapartado_actual = tarea.get("subapartado_referencia", "Sin Subapartado")
 
@@ -1625,20 +1625,19 @@ def phase_4_page(model):
                     if ultimo_apartado_escrito: documento.add_page_break()
                     documento.add_heading(apartado_actual, level=1)
                     ultimo_apartado_escrito = apartado_actual
-                    ultimo_subapartado_escrito = "" # Reseteamos el subapartado al cambiar de apartado principal
+                    ultimo_subapartado_escrito = "" # Reseteamos el subapartado
                 
                 if subapartado_actual and subapartado_actual != ultimo_subapartado_escrito:
                     documento.add_heading(subapartado_actual, level=2)
                     ultimo_subapartado_escrito = subapartado_actual
 
-                # Lógica de llamada a la IA (sin cambios)
                 respuesta_ia = None
                 prompt_actual = tarea.get("prompt_para_asistente")
                 if prompt_actual:
                     try:
                         response = chat_redaccion.send_message(prompt_actual)
                         respuesta_ia = response.text.strip()
-                        time.sleep(1) # Pequeña pausa para no saturar la API
+                        time.sleep(1)
                     except Exception as e:
                         st.error(f"Fallo al procesar la tarea {i+1}: {e}")
                         continue
@@ -1659,7 +1658,6 @@ def phase_4_page(model):
                     else:
                         agregar_markdown_a_word(documento, respuesta_ia)
 
-            # Lógica de guardado (sin cambios)
             project_name = st.session_state.selected_project['name']
             safe_project_name = re.sub(r'[\\/*?:"<>|]', "", project_name).replace(' ', '_')
             nombre_archivo_final = f"Memoria_Tecnica_{safe_project_name}.docx"
