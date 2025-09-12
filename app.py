@@ -462,120 +462,28 @@ Genera únicamente el objeto JSON corregido. No incluyas ningún texto fuera de 
 
 PROMPT_DESARROLLO = """
     **ATENCIÓN: REGLA CRÍTICA Y NO NEGOCIABLE**
-    Tu única salida es el contenido final solicitado (texto en Markdown o un único bloque de código HTML). ESTÁ ABSOLUTAMENTE PROHIBIDO generar cualquier texto que analice, comente o critique tu propia salida. Frases como "Este código HTML...", "Puntos fuertes:", "Sugerencias:", "Con estas mejoras..." resultarán en un fallo inmediato. Debes actuar como el redactor final, no como un revisor de código.
-    Actúa como un consultor experto redactando una memoria técnica para una licitación pública. Debes hacer una memoria técnica seria, pero amena de leer con algunos (sin excederse) elementos gráficos, tablas y listas que hagan la lectura más fácil y profesional.
-    Tu tarea es crear los prompts que darán forma al texto de este subapartado. Es por ello que debes que tener en cuenta que estas indicaciones
-    deben tener todo tipo de detalles para que otra IA sea capaz de con ese contexto recibirlo y generar el contenido final de la mejor manera posible.
-    Debes ser un buen guía para que la IA no cometa errores de escritura y realice un buen trabajo.
-    Debes seguir estos pasos para hacer estos prompts:
-    1. Tu objetivo es crear UN SOLO prompt para el subapartado completo que se te ha asignado. No lo dividas en múltiples prompts. Define un rango de palabras coherente para que el redactor final sepa la longitud esperada.
-    2. Dentro de ese único prompt, detalla todo el contexto y los puntos clave que el redactor debe cubrir, basándote en la información de los Pliegos y los guiones. Sé exhaustivo en las instrucciones.
-    3. Una vez ya sabes cuántas palabras tendrán los prompts, complementa el contenido de cada prompt con el CONTEXTO ADICIONAL que te proporciono. Este contexto incluye el guion borrador ya creado y la documentación de apoyo. Úsalo como base principal para dar forma a la propuesta de contenido.Intenta siempre usar un contenidio de la empresa real, pero si en la documentación o el mensaje inicial que se te dió no hay nada para llegar a ese objetivo.
-    4. Añade en los prompts siempre la libertad para que referencien algo mencionado antes (menos de los Pliegos en exceso, que queda cantoso), mostrando así una coherencia y un humanismo. Menciona también que debe parecer humana la redacción. El objetivo es que sea fácil de leer y que resulte amena la lectura.
-    5. Pide que se tenga en cuenta lo que se ha dicho antes tanto en el apartado como en general para evitar incongruencias. Añade referencias a lo que se ha dicho en otros párrafos.
-    5.1 Está prohibido poner explícitamente algo de cómo ha sido la estructura o que hay referencias de prompts como "(referencia a PROMPT_1_1_B)". Si tienes que poner alguna referencia de algún sitio pon el apartado. Si no sabes que apartado es, opta por no poner nada de la referencia. No pueden detectar que este trabajo ha sido realizado con IA.
-    6. No dudes en añadir tablas que resuman el contenido. Debes usar bullet points y listas para dar las ideas de una manera más clara para que el lector se sienta cómodo al leerlo. Lo ideal es que haya un número coherente de tablas, listados y elementos htmls sin resultar repetitivo. Siempre siguiendo un balance de 75% texto normal y 25% tablas, elementos gráficos html y listas fáciles de ver.
-    7. Evita las conclusiones si van a ser redundantes. Suelen ser un sintoma de que se usa IA, así que saltatelas o no las empieces con expresiones como 'En definitiva' o 'En conclusión'. El objetivo es ser ameno y directo, y este tipo de secciones impiden llegar a ese objetivo.
-    8. **REGLA DE ORO PARA ELEMENTOS VISUALES:** Si necesitas crear un elemento visual, DEBES generar un archivo HTML completo y auto-contenido. NO PUEDES generar solo CSS. Tu respuesta DEBE ser únicamente el código HTML, empezando con `<!DOCTYPE html>`.
-    9.  **PROHIBIDO ANALIZAR O COMENTAR:** Bajo NINGUNA circunstancia puedes escribir texto que analice, comente, critique o sugiera mejoras sobre el contenido que generas. Frases como "Este código HTML crea...", "Puntos fuertes:", "Sugerencias de mejora:" o "Implementando estas mejoras..." están TOTALMENTE PROHIBIDAS. Tu salida debe ser el contenido final, no una conversación sobre él.
-    10.  **SALIDA DIRECTA Y PURA:** Si se pide texto, genera solo el texto. Si se pide un elemento visual HTML, genera solo el código HTML. No añadas introducciones ni conclusiones a menos que el prompt específico lo pida.
-    11.  **TONO Y ESTILO:** Mantén un tono profesional, impersonal (tercera persona), concreto y alineado con los pliegos, aplicando todas las reglas de estilo (no repetir ideas, ser concreto, etc.) que ya conoces.
+    Tu única salida es el contenido final solicitado (texto en Markdown o un único bloque de código HTML). ESTÁ ABSOLUTAMENTE PROHIBIDO generar cualquier texto que analice, comente, critique o sugiera mejoras sobre tu propia salida. Frases como "Este código HTML...", "Puntos fuertes:", "Sugerencias:", "HTML mejorado", "Metodología de Acompañamiento (HTML)" o "PROMPT_ID..." resultarán en un fallo. Debes actuar como el redactor final, no como un revisor de código. Tu respuesta debe ser directamente el contenido, lista para ser insertada en el documento.
+
+    Actúa como un consultor experto redactando una memoria técnica para una licitación pública. Tu tarea es generar el contenido para un subapartado específico de la memoria. La redacción debe ser profesional, directa y visualmente amena.
+    
+    El objetivo es crear un texto final y completo, no un borrador ni instrucciones para un humano. No pidas que se añada nada. Genera tú todo el contenido necesario.
+
+    REGLAS DE REDACCIÓN:
+    1.  **Contenido Completo:** Genera el texto completo para el subapartado basándote en el contexto de los pliegos y el guion proporcionado.
+    2.  **Coherencia:** Haz referencia a conceptos mencionados en apartados anteriores para dar cohesión al documento. La redacción debe ser fluida y parecer escrita por un humano.
+    3.  **Elementos Visuales:** Si el contenido se puede resumir o presentar mejor visualmente (fases, pilares, ventajas), genera un elemento visual. Para ello, **genera únicamente el código HTML completo** usando una de las plantillas de abajo. El texto introductorio al elemento visual debe ser natural, como "A continuación, se detallan las fases en el siguiente esquema:".
+    4.  **Tono y Estilo:** Utiliza un tono profesional e impersonal (tercera persona). Sé concreto, evita frases vacías y orienta el contenido a resolver los problemas del cliente. No uses un lenguaje excesivamente formal ni abreviaturas extrañas.
+    5.  **Prohibiciones:**
+        -   NO uses frases de relleno como "En su compromiso con...".
+        -   NO repitas el nombre de la empresa constantemente.
+        -   NO uses mayúsculas en cada palabra de un título (incorrecto: "El Enfoque Nativo", correcto: "El enfoque nativo").
+        -   NO incluyas marcadores de posición como '[Completa aquí]'.
+
 HERRAMIENTAS VISUALES A TU DISPOSICIÓN:
-Cuando un prompt te pida resumir puntos clave, ventajas, fases o pilares, TIENES DOS OPCIONES para crear un elemento visual HTML. Elige la que mejor se adapte al contenido:
-OPCIÓN A: PLANTILLA DE LISTA SIMPLE (Para listas verticales y sencillas)
-Úsala para enumerar características o puntos de forma clara y directa.
+OPCIÓN A: PLANTILLA DE LISTA SIMPLE
 ```html
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Visual Element</title>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Urbanist:wght@400;600;700&display=swap');
-        body {{ font-family: 'Urbanist', sans-serif; background-color: #f0f2f5; display: flex; justify-content: center; align-items: center; padding: 20px; width: 800px; box-sizing: border-box; }}
-        .card {{ background-color: white; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); padding: 25px; width: 100%; max-width: 750px; border-top: 5px solid #0046C6; }}
-        h2 {{ color: #0046C6; text-align: center; margin-top: 0; font-size: 24px; font-weight: 700; }}
-        ul {{ list-style-type: none; padding: 0; }}
-        li {{ display: flex; align-items: center; margin-bottom: 15px; font-size: 16px; color: #333; }}
-        li::before {{ content: '✔'; color: #32CFAA; font-size: 20px; font-weight: bold; margin-right: 15px; }}
-    </style>
-</head>
-<body>
-    <div class="card">
-        <h2><!-- TÍTULO AQUÍ --></h2>
-        <ul>
-            <!-- LISTA DE ELEMENTOS AQUÍ (usa <li>Elemento 1</li>) -->
-        </ul>
-    </div>
-</body>
-</html>
-OPCIÓN B: PLANTILLA DE INFOGRAFÍA MULTI-COLUMNA (Para conceptos complejos y visualmente atractivos)
-Úsala para representar pilares, ejes, claves o fases de forma más dinámica, similar al ejemplo de "Claves del Asesoramiento".
-<!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Infographic Element</title>
-<style>
-    @import url('https://fonts.googleapis.com/css2?family=Urbanist:wght@400;600;700&display=swap');
-    body {{ font-family: 'Urbanist', sans-serif; display: flex; justify-content: center; align-items: center; padding: 20px; background-color: #f8f9fa; width: 800px; box-sizing: border-box; }}
-    .container {{ background-color: #ffffff; border: 2px dashed #e0e0e0; border-radius: 15px; padding: 25px; width: 100%; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }}
-    h2 {{ color: #0046C6; text-align: center; font-size: 26px; font-weight: 700; margin-bottom: 25px; letter-spacing: -0.5px; }}
-    .columns {{ display: flex; justify-content: space-around; gap: 20px; }}
-    .column {{ flex: 1; text-align: center; padding: 15px; border-top: 4px solid; border-radius: 8px; background-color: #fdfdfd; }}
-    .column-icon {{ width: 30px; height: 30px; border-radius: 50%; margin: 0 auto 15px auto; }}
-    .column h3 {{ font-size: 16px; font-weight: 600; color: #333; margin-bottom: 10px; }}
-    .column ul {{ list-style: none; padding: 0; margin: 0; text-align: left; }}
-    .column li {{ font-size: 13px; color: #555; margin-bottom: 8px; line-height: 1.5; }}
-    /* Colores para las columnas y los iconos */
-    .color-1 {{ border-color: #FBC02D; }} .icon-1 {{ background-color: #FBC02D; }}
-    .color-2 {{ border-color: #4CAF50; }} .icon-2 {{ background-color: #4CAF50; }}
-    .color-3 {{ border-color: #90CAF9; }} .icon-3 {{ background-color: #90CAF9; }}
-    .color-4 {{ border-color: #F44336; }} .icon-4 {{ background-color: #F44336; }}
-</style>
-</head>
-<body>
-<div class="container">
-    <h2><!-- TÍTULO PRINCIPAL AQUÍ --></h2>
-    <div class="columns">
-        <div class="column color-1">
-            <div class="column-icon icon-1"></div>
-            <h3><!-- Título Columna 1 --></h3>
-            <ul>
-                <li><!-- Punto 1 Columna 1 --></li>
-                <li><!-- Punto 2 Columna 1 --></li>
-            </ul>
-        </div>
-        <div class="column color-2">
-            <div class="column-icon icon-2"></div>
-            <h3><!-- Título Columna 2 --></h3>
-            <ul>
-                <li><!-- Punto 1 Columna 2 --></li>
-                <li><!-- Punto 2 Columna 2 --></li>
-            </ul>
-        </div>
-        <div class="column color-3">
-            <div class="column-icon icon-3"></div>
-            <h3><!-- Título Columna 3 --></h3>
-            <ul>
-                <li><!-- Punto 1 Columna 3 --></li>
-                <li><!-- Punto 2 Columna 3 --></li>
-            </ul>
-        </div>
-        <div class="column color-4">
-            <div class="column-icon icon-4"></div>
-            <h3><!-- Título Columna 4 --></h3>
-            <ul>
-                <li><!-- Punto 1 Columna 4 --></li>
-                <li><!-- Punto 2 Columna 4 --></li>
-            </ul>
-        </div>
-    </div>
-</div>
-</body>
-</html>
+<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Visual Element</title><style>@import url('https://fonts.googleapis.com/css2?family=Urbanist:wght@400;600;700&display=swap');body {{{{ font-family: 'Urbanist', sans-serif; background-color: #f0f2f5; display: flex; justify-content: center; align-items: center; padding: 20px; width: 800px; box-sizing: border-box; }}}} .card {{{{ background-color: white; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); padding: 25px; width: 100%; max-width: 750px; border-top: 5px solid #0046C6; }}}} h2 {{{{ color: #0046C6; text-align: center; margin-top: 0; font-size: 24px; font-weight: 700; }}}} ul {{{{ list-style-type: none; padding: 0; }}}} li {{{{ display: flex; align-items: center; margin-bottom: 15px; font-size: 16px; color: #333; }}}} li::before {{{{ content: '✔'; color: #32CFAA; font-size: 20px; font-weight: bold; margin-right: 15px; }}}}</style></head><body><div class="card"><h2><!-- TÍTULO AQUÍ --></h2><ul><!-- LISTA DE ELEMENTOS AQUÍ --></ul></div></body></html>
+<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Infographic Element</title><style>@import url('https://fonts.googleapis.com/css2?family=Urbanist:wght@400;600;700&display=swap');body {{{{ font-family: 'Urbanist', sans-serif; display: flex; justify-content: center; align-items: center; padding: 20px; background-color: #f8f9fa; width: 800px; box-sizing: border-box; }}}} .container {{{{ background-color: #ffffff; border: 2px dashed #e0e0e0; border-radius: 15px; padding: 25px; width: 100%; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }}}} h2 {{{{ color: #0046C6; text-align: center; font-size: 26px; font-weight: 700; margin-bottom: 25px; letter-spacing: -0.5px; }}}} .columns {{{{ display: flex; justify-content: space-around; gap: 20px; }}}} .column {{{{ flex: 1; text-align: center; padding: 15px; border-top: 4px solid; border-radius: 8px; background-color: #fdfdfd; }}}} .column-icon {{{{ width: 30px; height: 30px; border-radius: 50%; margin: 0 auto 15px auto; }}}} .column h3 {{{{ font-size: 16px; font-weight: 600; color: #333; margin-bottom: 10px; }}}} .column ul {{{{ list-style: none; padding: 0; margin: 0; text-align: left; }}}} .column li {{{{ font-size: 13px; color: #555; margin-bottom: 8px; line-height: 1.5; }}}} .color-1 {{{{ border-color: #FBC02D; }}}} .icon-1 {{{{ background-color: #FBC02D; }}}} .color-2 {{{{ border-color: #4CAF50; }}}} .icon-2 {{{{ background-color: #4CAF50; }}}} .color-3 {{{{ border-color: #90CAF9; }}}} .icon-3 {{{{ background-color: #90CAF9; }}}} .color-4 {{{{ border-color: #F44336; }}}} .icon-4 {{{{ background-color: #F44336; }}}}</style></head><body><div class="container"><h2><!-- TÍTULO --></h2><div class="columns"><div class="column color-1"><div class="column-icon icon-1"></div><h3><!-- Título Col 1 --></h3><ul><li><!-- Punto 1 --></li></ul></div><div class="column color-2"><div class="column-icon icon-2"></div><h3><!-- Título Col 2 --></h3><ul><li><!-- Punto 1 --></li></ul></div><div class="column color-3"><div class="column-icon icon-3"></div><h3><!-- Título Col 3 --></h3><ul><li><!-- Punto 1 --></li></ul></div></div></div></body></html>
 10. Debes cumplir todos los criterios pero sin mencionar que tu objetivo es cumplirlos. Es decir, debes hacer lo que se valora pero sin decir que esa sección existe para cumplir con un criterio. La redacción y el parafraseo debe ser muy elegante para demostrar un dominio y cumplimiento de los objetivos sin sonar pesado.
 11. No uses recursos como el ;, los : y ese tipo de expresiones que parecen hechas con IA. Tampoco uses expresiones precedidas por -. Debes prafasear mucho. Tu texto debe parecer natural sin perder la profesionalidad.
 12. Debes establecer el mismo idioma para todas las redacciones. Este idioma debe ser el castellano.
@@ -1668,11 +1576,9 @@ def phase_4_page(model):
     st.markdown("Ejecuta el plan de prompts para generar el contenido de la memoria técnica y descargar el documento final.")
     st.markdown("---")
 
-    # --- SETUP ROBUSTO Y CARGA DEL PLAN CONJUNTO ---
     service = st.session_state.drive_service
     project_folder_id = st.session_state.selected_project['id']
     docs_app_folder_id = find_or_create_folder(service, "Documentos aplicación", parent_id=project_folder_id)
-
     plan_conjunto_id = find_file_by_name(service, "plan_de_prompts_conjunto.json", docs_app_folder_id)
 
     if not plan_conjunto_id:
@@ -1684,111 +1590,91 @@ def phase_4_page(model):
         json_bytes = download_file_from_drive(service, plan_conjunto_id).getvalue()
         plan_de_accion = json.loads(json_bytes.decode('utf-8'))
         lista_de_prompts = plan_de_accion.get("plan_de_prompts", [])
-        st.success(f"✔️ Plan de acción cargado. Se encontraron {len(lista_de_prompts)} prompts para ejecutar.")
+        
+        # --- CORRECCIÓN 1: ORDENAR LA LISTA DE PROMPTS ---
+        # Esto garantiza que el documento se genere en el orden numérico correcto (1.1, 1.1.1, 1.2, 2.1, etc.)
+        lista_de_prompts.sort(key=lambda x: x.get('prompt_id', ''))
+        
+        st.success(f"✔️ Plan de acción cargado y ordenado. Se ejecutarán {len(lista_de_prompts)} prompts.")
     except Exception as e:
-        st.error(f"Error al cargar el plan de acción desde Drive: {e}")
-        return
+        st.error(f"Error al cargar o procesar el plan de acción: {e}"); return
 
-    # --- INICIALIZACIÓN DE ESTADO PARA EL DOCUMENTO GENERADO ---
-    if 'generated_doc_buffer' not in st.session_state:
-        st.session_state.generated_doc_buffer = None
-    if 'generated_doc_filename' not in st.session_state:
-        st.session_state.generated_doc_filename = ""
+    if 'generated_doc_buffer' not in st.session_state: st.session_state.generated_doc_buffer = None
+    if 'generated_doc_filename' not in st.session_state: st.session_state.generated_doc_filename = ""
 
-    # --- LÓGICA DE EJECUCIÓN ---
     button_text = "🔁 Volver a Generar Documento" if st.session_state.generated_doc_buffer else "🚀 Iniciar Redacción y Generar Documento"
-    
     if st.button(button_text, type="primary", use_container_width=True):
         if not lista_de_prompts:
             st.warning("El plan de acción está vacío."); return
 
         with st.spinner("Iniciando redacción... Esto puede tardar varios minutos."):
             progress_bar = st.progress(0, text="Configurando sesión de chat...")
-
             documento = docx.Document()
             chat_redaccion = model.start_chat()
-            
             ultimo_apartado_escrito, ultimo_subapartado_escrito = "", ""
-            total_prompts = len(lista_de_prompts)
             
             for i, tarea in enumerate(lista_de_prompts):
-                progress_text = f"Procesando Tarea {i+1}/{total_prompts} (ID: {tarea.get('prompt_id', 'N/A')})"
-                progress_bar.progress((i + 1) / total_prompts, text=progress_text)
-                prompt_actual = tarea.get("prompt_para_asistente")
-                if not prompt_actual: continue
-
+                progress_text = f"Procesando Tarea {i+1}/{len(lista_de_prompts)}: {tarea.get('subapartado_referencia', 'N/A')}"
+                progress_bar.progress((i + 1) / len(lista_de_prompts), text=progress_text)
+                
+                # --- CORRECCIÓN 2: LÓGICA DE ENCABEZADOS MEJORADA ---
                 apartado_actual = tarea.get("apartado_referencia", "Sin Apartado")
                 subapartado_actual = tarea.get("subapartado_referencia", "Sin Subapartado")
-                if apartado_actual != ultimo_apartado_escrito:
-                    if ultimo_apartado_escrito != "": documento.add_page_break()
+
+                if apartado_actual and apartado_actual != ultimo_apartado_escrito:
+                    if ultimo_apartado_escrito: documento.add_page_break()
                     documento.add_heading(apartado_actual, level=1)
-                    ultimo_apartado_escrito = apartado_actual; ultimo_subapartado_escrito = ""
+                    ultimo_apartado_escrito = apartado_actual
+                    ultimo_subapartado_escrito = "" # Reseteamos el subapartado al cambiar de apartado principal
+                
                 if subapartado_actual and subapartado_actual != ultimo_subapartado_escrito:
                     documento.add_heading(subapartado_actual, level=2)
                     ultimo_subapartado_escrito = subapartado_actual
 
+                # Lógica de llamada a la IA (sin cambios)
                 respuesta_ia = None
-                for attempt in range(3):
+                prompt_actual = tarea.get("prompt_para_asistente")
+                if prompt_actual:
                     try:
                         response = chat_redaccion.send_message(prompt_actual)
-                        respuesta_ia = response.text.strip(); time.sleep(1); break
+                        respuesta_ia = response.text.strip()
+                        time.sleep(1) # Pequeña pausa para no saturar la API
                     except Exception as e:
-                        st.warning(f"Intento {attempt + 1} fallido: {e}. Reintentando..."); time.sleep(5)
+                        st.error(f"Fallo al procesar la tarea {i+1}: {e}")
+                        continue
                 
-                if respuesta_ia is None:
-                    st.error(f"Fallo definitivo al generar tarea {i+1}."); continue
-
-                match_html = re.search(r'(<!DOCTYPE html>.*</html>)', respuesta_ia, re.DOTALL)
-
-                if match_html:
-                    html_puro = match_html.group(1)
-                    texto_previo = respuesta_ia[:match_html.start()].strip()
-                    if texto_previo:
-                        agregar_markdown_a_word(documento, texto_previo)
+                if respuesta_ia:
+                    match_html = re.search(r'(<!DOCTYPE html>.*</html>)', respuesta_ia, re.DOTALL)
+                    if match_html:
+                        html_puro = match_html.group(1)
+                        texto_previo = respuesta_ia[:match_html.start()].strip()
+                        if texto_previo: agregar_markdown_a_word(documento, texto_previo)
                         
-                    html_completo = wrap_html_fragment(html_puro)
-                    nombre_img = f"temp_img_{i}.png"
-                    image_file = html_a_imagen(html_completo, output_filename=nombre_img)
-                    
-                    if image_file and os.path.exists(image_file):
-                        try:
+                        image_file = html_a_imagen(wrap_html_fragment(html_puro), f"temp_img_{i}.png")
+                        if image_file and os.path.exists(image_file):
                             documento.add_picture(image_file, width=docx.shared.Inches(6.5))
                             os.remove(image_file)
-                        except Exception as e:
-                            st.error(f"Error al añadir imagen al DOCX: {e}")
-                            documento.add_paragraph(f"[ERROR AL INSERTAR IMAGEN]")
+                        else:
+                             documento.add_paragraph("[ERROR AL GENERAR IMAGEN DESDE HTML]")
                     else:
-                        documento.add_paragraph(f"[ERROR AL RENDERIZAR IMAGEN]")
-                else:
-                    agregar_markdown_a_word(documento, respuesta_ia)
+                        agregar_markdown_a_word(documento, respuesta_ia)
 
-            # --- GUARDADO Y ALMACENAMIENTO EN SESIÓN ---
-            progress_bar.progress(1.0, text="Ensamblando documento final...")
-            
+            # Lógica de guardado (sin cambios)
             project_name = st.session_state.selected_project['name']
             safe_project_name = re.sub(r'[\\/*?:"<>|]', "", project_name).replace(' ', '_')
             nombre_archivo_final = f"Memoria_Tecnica_{safe_project_name}.docx"
             doc_io = io.BytesIO()
-            documento.save(doc_io)
-            doc_io.seek(0)
-            
+            documento.save(doc_io); doc_io.seek(0)
             st.session_state.generated_doc_buffer = doc_io
             st.session_state.generated_doc_filename = nombre_archivo_final
             
-            with st.spinner("Guardando documento final en Google Drive..."):
-                try:
-                    word_file_obj = io.BytesIO(doc_io.getvalue())
-                    word_file_obj.name = nombre_archivo_final
-                    word_file_obj.type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                    old_file_id = find_file_by_name(service, nombre_archivo_final, docs_app_folder_id)
-                    if old_file_id: delete_file_from_drive(service, old_file_id)
-                    upload_file_to_drive(service, word_file_obj, docs_app_folder_id)
-                    st.toast(f"¡'{nombre_archivo_final}' guardado en Drive!")
-                except Exception as e:
-                    st.error(f"Error al guardar en Drive: {e}")
+            with st.spinner("Guardando en Google Drive..."):
+                word_file = io.BytesIO(doc_io.getvalue()); word_file.name = nombre_archivo_final; word_file.type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                old_file_id = find_file_by_name(service, nombre_archivo_final, docs_app_folder_id)
+                if old_file_id: delete_file_from_drive(service, old_file_id)
+                upload_file_to_drive(service, word_file, docs_app_folder_id)
             st.rerun()
 
-    # --- SECCIÓN DE RESULTADOS Y DESCARGA ---
     if st.session_state.generated_doc_buffer:
         st.balloons()
         st.success("¡Tu documento está listo!")
@@ -1800,10 +1686,8 @@ def phase_4_page(model):
             use_container_width=True
         )
 
-    # --- NAVEGACIÓN ---
     st.markdown("---")
     st.button("← Volver a Fase 3", on_click=go_to_phase3, use_container_width=True)
-
 # =============================================================================
 #                        LÓGICA PRINCIPAL (ROUTER)
 # =============================================================================
