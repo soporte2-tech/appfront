@@ -556,7 +556,7 @@ PROMPT_DESARROLLO = """
     19. No menciones el nombre de la empresa que se presenta a la licitación todo el rato. Ya se sabe que es la empresa, no hace falta ponerlo tan repetidamente.
     20. NO PONGAS NUNCA los títulos las primeras letras de las palabras en mayusculas. Es decir si la frase es "El Enfoque Nativo en la Nube y la IA" ponlo así "El enfoque nativo en la nube y la IA". Cuida mucho eso en tu redacción es fundamental.
     21. ESTÁ PROHIBIDO GENERAR PROMPTS QUE INCLUYAN INSTRUCCIONES O MARCADORES DE POSICIÓN como '[Completa aquí]' o '[Ajusta la tabla]'. El prompt debe contener toda la información para que el redactor final genere el texto completo, no para que le dé instrucciones.
-
+    22. **REGLA FINAL Y ABSOLUTA:** Tu única salida debe ser el contenido solicitado. Si se te pide Markdown, genera SÓLO Markdown. Si se te pide un elemento visual HTML, genera SÓLO el código `<!DOCTYPE html>...</html>`. No incluyas NINGUNA palabra de explicación, análisis, saludo, comentario o contexto sobre lo que has generado. Tu respuesta debe ser pura y directa.
 
     Estructura obligatoria para cada prompt: Cada prompt debe comenzar indicando con claridad qué apartado se va a redactar y cuál es el objetivo específico de ese apartado dentro de la memoria. A continuación, debe definir el rango o número aproximado de palabras que debe ocupar el texto. Seguidamente, se incluirá una explicación de contexto general de la dictación, detallando todos los puntos y requisitos que se deben cubrir en ese apartado. Después, se aportará un contexto concreto de la empresa, para cumplir esos requisitos presentando la propuesta de la empresa totalmente personalizada a sus fortalezas . Finalmente, el prompt debe cerrar con una lista de matices o consideraciones importantes para la redacción (tono, estilo, prohibiciones, obligatoriedades, etc.) las cuáles hemos pautado anteriormente cuando mencionamos las reglas, que sirvan como guía de calidad y eviten errores habituales.
 
@@ -1668,23 +1668,44 @@ def phase_4_page(model):
                 if respuesta_ia is None:
                     st.error(f"Fallo definitivo al generar tarea {i+1}."); continue
 
-                # =================== ¡AQUÍ ESTÁ LA NUEVA LÓGICA! ===================
-                # Comprobación flexible para cualquier tipo de HTML
-                if respuesta_ia.startswith('<') and respuesta_ia.endswith('>'):
-                    html_completo = wrap_html_fragment(respuesta_ia)
-                    nombre_img = f"temp_img_{i}.png"
-                    image_file = html_a_imagen(html_completo, output_filename=nombre_img)
-                    if image_file and os.path.exists(image_file):
-                        try:
-                            documento.add_picture(image_file, width=docx.shared.Inches(6.5))
-                            os.remove(image_file)
-                        except Exception as e:
-                            st.error(f"Error al añadir imagen al DOCX: {e}")
-                            documento.add_paragraph(f"[ERROR AL INSERTAR IMAGEN]")
-                    else:
-                        documento.add_paragraph(f"[ERROR AL RENDERIZAR IMAGEN]")
-                else:
-                    agregar_markdown_a_word(documento, respuesta_ia)
+# =================== ¡AQUÍ ESTÁ LA NUEVA LÓGICA MEJORADA! ===================
+# Usamos una expresión regular para buscar un bloque HTML completo en la respuesta.
+# re.DOTALL es crucial para que '.' también coincida con saltos de línea.
+match_html = re.search(r'(<!DOCTYPE html>.*</html>)', respuesta_ia, re.DOTALL)
+
+if match_html:
+    # Si encontramos una coincidencia, extraemos SOLO el bloque HTML.
+    html_puro = match_html.group(1)
+    
+    # Opcional pero recomendado: Añadimos al Word el texto que venía ANTES del HTML.
+    texto_previo = respuesta_ia[:match_html.start()].strip()
+    if texto_previo:
+        agregar_markdown_a_word(documento, texto_previo)
+        
+    # Ahora generamos la imagen desde el HTML puro.
+    html_completo = wrap_html_fragment(html_puro) # wrap_html_fragment es seguro, si ya es completo lo deja igual
+    nombre_img = f"temp_img_{i}.png"
+    image_file = html_a_imagen(html_completo, output_filename=nombre_img)
+    
+    if image_file and os.path.exists(image_file):
+        try:
+            documento.add_picture(image_file, width=docx.shared.Inches(6.5))
+            os.remove(image_file)
+        except Exception as e:
+            st.error(f"Error al añadir imagen al DOCX: {e}")
+            documento.add_paragraph(f"[ERROR AL INSERTAR IMAGEN]")
+    else:
+        documento.add_paragraph(f"[ERROR AL RENDERIZAR IMAGEN]")
+        
+    # Opcional: Añadimos el texto que venía DESPUÉS del HTML.
+    texto_posterior = respuesta_ia[match_html.end():].strip()
+    if texto_posterior:
+        agregar_markdown_a_word(documento, texto_posterior)
+
+else:
+    # Si no se encontró ningún bloque HTML, tratamos toda la respuesta como Markdown.
+    agregar_markdown_a_word(documento, respuesta_ia)
+# =========================================================================
                 # =================================================================
 
             # --- GUARDADO Y ALMACENAMIENTO EN SESIÓN ---
