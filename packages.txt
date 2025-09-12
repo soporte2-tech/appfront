@@ -1,3 +1,5 @@
 wkhtmltopdf
 libxrender1
 fonts-ubuntu
+xfonts-base
+xfonts-75dpi
