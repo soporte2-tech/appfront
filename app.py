@@ -1450,6 +1450,10 @@ def phase_2_page(model):
 #           VERSIÓN FINAL Y OPTIMIZADA DE phase_3_page (CON BOTÓN DE BORRADO)
 # =============================================================================
 
+# =============================================================================
+#           VERSIÓN FINAL Y COMPLETA DE phase_3_page (CORRECCIÓN DE UNIFICACIÓN)
+# =============================================================================
+
 def phase_3_page(model):
     """Página interactiva para generar, borrar, descargar y unificar planes de prompts."""
     st.markdown("<h3>FASE 3: Centro de Mando de Prompts</h3>", unsafe_allow_html=True)
@@ -1487,9 +1491,10 @@ def phase_3_page(model):
             else: subapartados_a_mostrar.append({"apartado": apartado_principal, "subapartado": subapartado_titulo, "indicaciones": "No se encontraron indicaciones detalladas."})
     if not subapartados_a_mostrar: st.warning("El índice no contiene subapartados."); return
 
-    # --- FUNCIONES DE ACCIÓN INTERNAS (GENERACIÓN, BORRADO, ETC.) ---
+    # --- FUNCIONES DE ACCIÓN INTERNAS ---
     def handle_individual_generation(matiz_info, callback_model, show_toast=True):
         apartado_titulo = matiz_info.get("apartado", "N/A"); subapartado_titulo = matiz_info.get("subapartado", "N/A")
+        # ... (código interno de esta función sin cambios)
         json_limpio_str = ""
         try:
             guiones_main_folder_id = find_or_create_folder(service, "Guiones de Subapartados", parent_id=project_folder_id)
@@ -1522,7 +1527,7 @@ def phase_3_page(model):
                 if old_plan_id: delete_file_from_drive(service, old_plan_id)
                 upload_file_to_drive(service, mock_file_obj, subapartado_folder_id)
                 if show_toast: st.toast(f"Plan para '{subapartado_titulo}' guardado.")
-                st.rerun() # <-- Añadido rerun para refrescar el estado tras generar
+                st.rerun()
                 return True
         except json.JSONDecodeError as json_err:
              st.error(f"Error Crítico: La IA devolvió un JSON inválido para '{subapartado_titulo}' que no se pudo reparar. Detalles: {json_err}")
@@ -1532,21 +1537,67 @@ def phase_3_page(model):
             st.error(f"Error generando prompts para '{subapartado_titulo}': {e}")
             return False
 
-    # =============== ¡NUEVA FUNCIÓN DE BORRADO! ===============
     def handle_individual_deletion(titulo, plan_id_to_delete):
         """Elimina un archivo de plan individual y refresca la página."""
         with st.spinner(f"Eliminando el plan para '{titulo}'..."):
             if delete_file_from_drive(service, plan_id_to_delete):
                 st.toast(f"Plan para '{titulo}' eliminado con éxito.")
                 st.rerun()
-    # ==========================================================
 
+    # =============== ¡INICIO DE LA CORRECCIÓN! ===============
     def handle_conjunto_generation():
-        # ... (código sin cambios)
-        pass
+        """Unifica todos los planes individuales en un único archivo maestro."""
+        with st.spinner("Unificando todos los planes de prompts..."):
+            try:
+                # 1. Localizar la carpeta principal de guiones
+                guiones_main_folder_id = find_or_create_folder(service, "Guiones de Subapartados", parent_id=project_folder_id)
+                
+                # 2. Listar todas las subcarpetas de guiones
+                carpetas_de_guiones = list_project_folders(service, guiones_main_folder_id)
+                
+                plan_conjunto_final = {"plan_de_prompts": []}
+                
+                # 3. Iterar sobre cada subcarpeta para encontrar y leer su plan individual
+                for nombre_carpeta, folder_id in carpetas_de_guiones.items():
+                    plan_id = find_file_by_name(service, "prompts_individual.json", folder_id)
+                    if plan_id:
+                        # 4. Descargar y procesar el JSON individual
+                        json_bytes = download_file_from_drive(service, plan_id).getvalue()
+                        plan_individual_obj = json.loads(json_bytes.decode('utf-8'))
+                        
+                        # 5. Añadir los prompts del plan individual a la lista maestra
+                        prompts_de_este_plan = plan_individual_obj.get("plan_de_prompts", [])
+                        plan_conjunto_final["plan_de_prompts"].extend(prompts_de_este_plan)
+
+                if not plan_conjunto_final["plan_de_prompts"]:
+                    st.warning("No se encontraron planes individuales para unificar. Genera al menos uno.")
+                    return
+
+                # 6. Preparar el archivo unificado para subirlo a Drive
+                nombre_archivo_final = "plan_de_prompts_conjunto.json"
+                json_bytes_finales = json.dumps(plan_conjunto_final, indent=2, ensure_ascii=False).encode('utf-8')
+                
+                mock_file_obj = io.BytesIO(json_bytes_finales)
+                mock_file_obj.name = nombre_archivo_final
+                mock_file_obj.type = "application/json"
+                
+                # 7. Borrar el archivo antiguo si existe y subir el nuevo
+                old_conjunto_id = find_file_by_name(service, nombre_archivo_final, docs_app_folder_id)
+                if old_conjunto_id:
+                    delete_file_from_drive(service, old_conjunto_id)
+                
+                upload_file_to_drive(service, mock_file_obj, docs_app_folder_id)
+                
+                st.success(f"¡Plan conjunto generado y guardado! Se unificaron {len(plan_conjunto_final['plan_de_prompts'])} prompts.")
+                st.balloons()
+
+            except Exception as e:
+                st.error(f"Ocurrió un error durante la unificación: {e}")
+    # =============== ¡FIN DE LA CORRECCIÓN! ===============
 
     # OPTIMIZACIÓN: OBTENER ESTADO DE PLANES UNA SOLA VEZ
     with st.spinner("Verificando estado de los planes de prompts..."):
+        # ... (código sin cambios)
         guiones_main_folder_id = find_or_create_folder(service, "Guiones de Subapartados", parent_id=project_folder_id)
         carpetas_de_guiones = list_project_folders(service, guiones_main_folder_id)
         planes_individuales_existentes = {}
@@ -1556,12 +1607,11 @@ def phase_3_page(model):
 
     # SECCIÓN SUPERIOR PARA ACCIONES EN LOTE
     st.subheader("Generación de Planes de Prompts en Lote")
+    # ... (código sin cambios)
     pending_keys = [matiz.get('subapartado') for matiz in subapartados_a_mostrar if re.sub(r'[\\/*?:"<>|]', "", matiz.get('subapartado')) in carpetas_de_guiones and re.sub(r'[\\/*?:"<>|]', "", matiz.get('subapartado')) not in planes_individuales_existentes]
-    
     def toggle_all_prompt_checkboxes():
         new_state = st.session_state.select_all_prompts_checkbox
         for key in pending_keys: st.session_state[f"pcb_{key}"] = new_state
-
     with st.container(border=True):
         col_sel_1, col_sel_2 = st.columns([1, 2])
         with col_sel_1:
@@ -1586,13 +1636,13 @@ def phase_3_page(model):
     st.subheader("Gestión de Planes de Prompts")
 
     # INTERFAZ DE GESTIÓN (HÍBRIDA Y OPTIMIZADA)
+    # ... (código sin cambios)
     for i, matiz in enumerate(subapartados_a_mostrar):
         subapartado_titulo = matiz.get("subapartado");
         if not subapartado_titulo: continue
         nombre_limpio = re.sub(r'[\\/*?:"<>|]', "", subapartado_titulo)
         guion_generado = nombre_limpio in carpetas_de_guiones
         plan_individual_id = planes_individuales_existentes.get(nombre_limpio)
-
         with st.container(border=True):
             col1, col2 = st.columns([2, 1])
             with col1:
@@ -1612,16 +1662,7 @@ def phase_3_page(model):
                     st.button("Generar Plan de Prompts", key=f"gen_ind_{i}", on_click=handle_individual_generation, args=(matiz, model, True), use_container_width=True, type="primary", disabled=not guion_generado)
                 else:
                     st.button("Re-generar Plan", key=f"gen_regen_{i}", on_click=handle_individual_generation, args=(matiz, model, True), use_container_width=True, type="secondary")
-                    
-                    # =============== ¡BOTÓN DE BORRADO AÑADIDO! ===============
-                    st.button(
-                        "🗑️ Borrar Plan",
-                        key=f"del_plan_{i}",
-                        on_click=handle_individual_deletion,
-                        args=(subapartado_titulo, plan_individual_id),
-                        use_container_width=True
-                    )
-                    # ==========================================================
+                    st.button("🗑️ Borrar Plan", key=f"del_plan_{i}", on_click=handle_individual_deletion, args=(subapartado_titulo, plan_individual_id), use_container_width=True)
 
     # BOTONES DE NAVEGACIÓN Y ACCIÓN FINAL
     st.markdown("---")
@@ -1631,7 +1672,6 @@ def phase_3_page(model):
         st.button("← Volver al Centro de Mando (F2)", on_click=go_to_phase2, use_container_width=True)
     with col_nav3_2:
         st.button("Ir a Redacción Final (F4) →", on_click=go_to_phase4, use_container_width=True)
-
 # =============================================================================
 #           FASE 4 - REDACCIÓN Y ENSAMBLAJE FINAL
 # =============================================================================
