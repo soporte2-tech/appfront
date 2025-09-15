@@ -1744,7 +1744,25 @@ def phase_4_page(model):
             documento.save(doc_io); doc_io.seek(0)
             st.session_state.generated_doc_buffer = doc_io
             st.session_state.generated_doc_filename = nombre_archivo_final
-            
+            with st.spinner("Guardando en Google Drive..."):
+                # Preparamos el archivo en memoria para la subida
+                word_file = io.BytesIO(doc_io.getvalue())
+                word_file.name = nombre_archivo_final # <-- Línea restaurada
+                word_file.type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document" # <-- Línea restaurada
+
+                # Buscamos si ya existe una versión antigua del archivo
+                old_file_id = find_file_by_name(service, nombre_archivo_final, docs_app_folder_id) # <-- Línea corregida y completa
+
+                # Si existe, la borramos antes de subir la nueva
+                if old_file_id:
+                    delete_file_from_drive(service, old_file_id)
+                
+                # Subimos el nuevo documento
+                upload_file_to_drive(service, word_file, docs_app_folder_id)
+                
+            st.rerun()
+
+    if st.session_state.generated_doc_buffer:
             with st.spinner("Guardando en Google Drive..."):
                 word_file = io.BytesIO(doc_io.getvalue()); word_file.name = nombre_archivo_final; word_file.type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                 old_file
