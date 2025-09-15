@@ -985,6 +985,8 @@ def project_selection_page():
                     st.rerun()
 # AÑADE ESTA FUNCIÓN A TUS FUNCIONES AUXILIARES (Y BORRA LA ANTIGUA)
 
+# REEMPLAZA TU FUNCIÓN de limpieza con esta versión más potente
+
 def limpiar_respuesta_final(texto_ia):
     """
     Limpia de forma agresiva la respuesta de la IA, eliminando todo
@@ -993,14 +995,18 @@ def limpiar_respuesta_final(texto_ia):
     if not isinstance(texto_ia, str):
         return ""
 
+    # <-- ¡NUEVA REGLA! Elimina comentarios específicos sobre la creación de diagramas/código.
+    # Esto busca frases que empiezan con "Este código..." y terminan con "...visualizar el diagrama." y lo elimina todo.
+    texto_limpio = re.sub(r'Este código crea.*?visualizar el diagrama\.', '', texto_ia, flags=re.DOTALL | re.IGNORECASE)
+    
     # Eliminar explicaciones comunes sobre el código HTML que la IA añade al final
-    texto_limpio = re.sub(r'El código HTML proporcionado genera.*?aún más:', '', texto_ia, flags=re.DOTALL | re.IGNORECASE)
+    texto_limpio = re.sub(r'El código HTML proporcionado genera.*?aún más:', '', texto_limpio, flags=re.DOTALL | re.IGNORECASE)
     
     # Eliminar cualquier bloque de código JSON que pueda haberse colado
     texto_limpio = re.sub(r'```json\s*\{.*?\}\s*```', '', texto_limpio, flags=re.DOTALL)
 
     # Eliminar los marcadores de bloque de código de texto plano o html
-    texto_limpio = re.sub(r'```(html)?', '', texto_limpio)
+    texto_limpio = re.sub(r'```(html|mermaid)?', '', texto_limpio)
     
     # Eliminar frases introductorias o de cierre que a veces añade la IA
     frases_a_eliminar = [
