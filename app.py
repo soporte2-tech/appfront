@@ -470,7 +470,8 @@ PROMPT_DESARROLLO = """
 
     REGLAS DE REDACCIÓN:
     1.  **Contenido Completo:** Genera el texto completo para el subapartado basándote en el contexto de los pliegos y el guion proporcionado.
-    2.  **Coherencia:** Haz referencia a conceptos mencionados en apartados anteriores para dar cohesión al documento. La redacción debe ser fluida y parecer escrita por un humano.
+    2.  **Coherencia:** Haz referencia a conceptos mencionados en apartados anteriores para dar cohesión al documento. La redacción debe ser fluida y parecer escrita por un humano. 
+    2.1.  **NO REPITAS EL TÍTULO:** El título del subapartado ya ha sido añadido al documento. **Empieza tu respuesta directamente con el primer párrafo del contenido.** No incluyas el título ni uses encabezados de Markdown (ej: `## Título`).
     3.  **Elementos Visuales:** Si el contenido se puede resumir mejor visualmente (fases, pilares, ventajas), genera un elemento visual. Para ello, **genera únicamente el código HTML completo usando una de las plantillas de abajo. ESTÁ PROHIBIDO generar cualquier otro tipo de código o sintaxis como Mermaid.** El texto introductorio al elemento visual debe ser natural, como "A continuación, se detallan las fases en el siguiente esquema:".
     4.  **Tono y Estilo:** Utiliza un tono profesional e impersonal (tercera persona). Sé concreto, evita frases vacías y orienta el contenido a resolver los problemas del cliente.
     5.  **Prohibiciones:**
