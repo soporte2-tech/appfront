@@ -1004,7 +1004,35 @@ def project_selection_page():
                     st.success(f"¡Proyecto '{new_project_name}' creado! Ya puedes cargar los documentos.")
                     go_to_phase1()
                     st.rerun()
+# AÑADE ESTA FUNCIÓN A TUS FUNCIONES AUXILIARES (Y BORRA LA ANTIGUA)
 
+def limpiar_respuesta_final(texto_ia):
+    """
+    Limpia de forma agresiva la respuesta de la IA, eliminando todo
+    el "meta-texto", explicaciones, y bloques de código mal formateados.
+    """
+    if not isinstance(texto_ia, str):
+        return ""
+
+    # Eliminar explicaciones comunes sobre el código HTML que la IA añade al final
+    texto_limpio = re.sub(r'El código HTML proporcionado genera.*?aún más:', '', texto_ia, flags=re.DOTALL | re.IGNORECASE)
+    
+    # Eliminar cualquier bloque de código JSON que pueda haberse colado
+    texto_limpio = re.sub(r'```json\s*\{.*?\}\s*```', '', texto_limpio, flags=re.DOTALL)
+
+    # Eliminar los marcadores de bloque de código de texto plano o html
+    texto_limpio = re.sub(r'```(html)?', '', texto_limpio)
+    
+    # Eliminar frases introductorias o de cierre que a veces añade la IA
+    frases_a_eliminar = [
+        r'^\s*Aquí tienes el contenido.*?:',
+        r'^\s*Claro, aquí está la redacción para.*?:',
+        r'^\s*##\s*.*?$' # Elimina cualquier título Markdown que la IA pueda repetir
+    ]
+    for patron in frases_a_eliminar:
+        texto_limpio = re.sub(patron, '', texto_limpio, flags=re.IGNORECASE | re.MULTILINE)
+
+    return texto_limpio.strip()
 # =============================================================================
 #           VERSIÓN DEFINITIVA DE phase_1_page()
 # =============================================================================
@@ -1597,6 +1625,8 @@ import imgkit # Y esta también
 #           FASE 4 - REDACCIÓN Y ENSAMBLAJE FINAL (VERSIÓN CORREGIDA)
 # =============================================================================
 
+# REEMPLAZA TU phase_4_page ENTERA CON ESTA VERSIÓN DEFINITIVA
+
 def phase_4_page(model):
     """Página para ejecutar el plan de prompts y generar el documento Word final."""
     st.markdown("<h3>FASE 4: Redacción y Ensamblaje Final</h3>", unsafe_allow_html=True)
@@ -1635,7 +1665,6 @@ def phase_4_page(model):
             documento = docx.Document()
             chat_redaccion = model.start_chat()
             
-            # --- LÓGICA DE ENCABEZADOS REESCRITA ---
             ultimo_apartado_escrito = None
             ultimo_subapartado_escrito = None
             
@@ -1646,38 +1675,41 @@ def phase_4_page(model):
                 apartado_actual = tarea.get("apartado_referencia")
                 subapartado_actual = tarea.get("subapartado_referencia")
 
-                # Escribe el encabezado del Apartado Principal (Nivel 1) solo si es nuevo
                 if apartado_actual and apartado_actual != ultimo_apartado_escrito:
-                    if ultimo_apartado_escrito is not None:  # Añade salto de página excepto antes del primero
+                    if ultimo_apartado_escrito is not None:
                         documento.add_page_break()
                     documento.add_heading(apartado_actual, level=1)
                     ultimo_apartado_escrito = apartado_actual
-                    ultimo_subapartado_escrito = None # Resetea el subapartado al cambiar de sección
+                    ultimo_subapartado_escrito = None
 
-                # Escribe el encabezado del Subapartado (Nivel 2) solo si es nuevo
                 if subapartado_actual and subapartado_actual != ultimo_subapartado_escrito:
                     documento.add_heading(subapartado_actual, level=2)
                     ultimo_subapartado_escrito = subapartado_actual
                 
-                # --- FIN DE LA LÓGICA REESCRITA ---
-
-                respuesta_ia = None
+                respuesta_ia_bruta = None
                 prompt_actual = tarea.get("prompt_para_asistente")
                 if prompt_actual:
                     try:
                         response = chat_redaccion.send_message(prompt_actual)
-                        respuesta_ia = response.text.strip()
+                        respuesta_ia_bruta = response.text
                         time.sleep(1)
                     except Exception as e:
                         st.error(f"Fallo al procesar la tarea {i+1}: {e}")
                         continue
                 
-                if respuesta_ia:
-                    match_html = re.search(r'(<!DOCTYPE html>.*</html>)', respuesta_ia, re.DOTALL)
+                if respuesta_ia_bruta:
+                    patron_html = re.compile(r'```html\s*(.*?)\s*```|(<div.*?>.*?</div>)|(<!DOCTYPE html>.*</html>)', re.DOTALL)
+                    match_html = patron_html.search(respuesta_ia_bruta)
+
                     if match_html:
-                        html_puro = match_html.group(1)
-                        texto_previo = respuesta_ia[:match_html.start()].strip()
-                        if texto_previo: agregar_markdown_a_word(documento, texto_previo)
+                        html_puro = next(g for g in match_html.groups() if g is not None)
+                        
+                        # <-- CAMBIO CLAVE: Combina el texto de antes y después del HTML
+                        texto_narrativo_completo = respuesta_ia_bruta[:match_html.start()] + respuesta_ia_bruta[match_html.end():]
+                        texto_limpio = limpiar_respuesta_final(texto_narrativo_completo)
+                        
+                        if texto_limpio:
+                            agregar_markdown_a_word(documento, texto_limpio)
                         
                         image_file = html_a_imagen(wrap_html_fragment(html_puro), f"temp_img_{i}.png")
                         if image_file and os.path.exists(image_file):
@@ -1686,7 +1718,9 @@ def phase_4_page(model):
                         else:
                              documento.add_paragraph("[ERROR AL GENERAR IMAGEN DESDE HTML]")
                     else:
-                        agregar_markdown_a_word(documento, respuesta_ia)
+                        texto_limpio = limpiar_respuesta_final(respuesta_ia_bruta)
+                        if texto_limpio:
+                            agregar_markdown_a_word(documento, texto_limpio)
 
             # Lógica de guardado (sin cambios)
             project_name = st.session_state.selected_project['name']
@@ -1699,24 +1733,7 @@ def phase_4_page(model):
             
             with st.spinner("Guardando en Google Drive..."):
                 word_file = io.BytesIO(doc_io.getvalue()); word_file.name = nombre_archivo_final; word_file.type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                old_file_id = find_file_by_name(service, nombre_archivo_final, docs_app_folder_id)
-                if old_file_id: delete_file_from_drive(service, old_file_id)
-                upload_file_to_drive(service, word_file, docs_app_folder_id)
-            st.rerun()
-
-    if st.session_state.generated_doc_buffer:
-        st.balloons()
-        st.success("¡Tu documento está listo!")
-        st.download_button(
-            label="🎉 Descargar Memoria Técnica Final (.docx)",
-            data=st.session_state.generated_doc_buffer,
-            file_name=st.session_state.generated_doc_filename,
-            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            use_container_width=True
-        )
-
-    st.markdown("---")
-    st.button("← Volver a Fase 3", on_click=go_to_phase3, use_container_width=True)
+                old_file
 # =============================================================================
 #                        LÓGICA PRINCIPAL (ROUTER)
 # =============================================================================
