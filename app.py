@@ -460,7 +460,7 @@ Tu única tarea es generar una **NUEVA VERSIÓN MEJORADA** del objeto JSON que i
 Genera únicamente el objeto JSON corregido. No incluyas ningún texto fuera de él.
 """
 
-ROMPT_DESARROLLO = """
+PROMPT_DESARROLLO = """
     **ATENCIÓN: REGLA CRÍTICA Y NO NEGOCIABLE**
     Tu única salida debe ser el contenido final solicitado (texto en Markdown o un único bloque de código HTML). ESTÁ ABSOLUTAMENTE PROHIBIDO generar cualquier texto que analice, comente o critique tu propia salida. Frases como "Este código HTML...", "Aquí tienes una versión modificada...", o cualquier tipo de análisis meta, resultarán en un fallo. Debes actuar como un redactor final, no como un revisor de código.
 
