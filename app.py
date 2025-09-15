@@ -829,6 +829,31 @@ def html_a_imagen(html_string, output_filename="temp_image.png"):
         st.error(f"Ocurrió un error al convertir HTML a imagen: {e}")
         st.code(f"Path de wkhtmltoimage intentado: {os.popen('which wkhtmltoimage').read().strip()}", language="bash")
         return None
+# AÑADE ESTA NUEVA FUNCIÓN A TU SCRIPT
+def limpiar_respuesta_narrativa(texto_ia):
+    """
+    Limpia la respuesta de la IA para la redacción final, eliminando:
+    - Bloques de código JSON.
+    - Frases introductorias comunes.
+    - El propio título del subapartado si la IA lo repite.
+    """
+    if not isinstance(texto_ia, str):
+        return ""
+
+    # Eliminar bloques de código JSON completos
+    texto_limpio = re.sub(r'```json\s*\{.*?\}\s*```', '', texto_ia, flags=re.DOTALL)
+    
+    # Eliminar frases introductorias comunes (puedes añadir más)
+    frases_a_eliminar = [
+        r'^\s*Aquí tienes el contenido para el subapartado.*?:',
+        r'^\s*Claro, aquí está la redacción para.*?:',
+        r'^\s*A continuación se presenta el contenido detallado:',
+        r'^\s*##\s*.*?$' # Elimina cualquier título Markdown que la IA pueda añadir
+    ]
+    for patron in frases_a_eliminar:
+        texto_limpio = re.sub(patron, '', texto_limpio, flags=re.IGNORECASE | re.MULTILINE).strip()
+
+    return texto_limpio
 
 # --- NAVEGACIÓN Y GESTIÓN DE ESTADO (actualizada) ---
 if 'page' not in st.session_state: st.session_state.page = 'landing'
