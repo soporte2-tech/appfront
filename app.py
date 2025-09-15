@@ -461,6 +461,20 @@ Genera únicamente el objeto JSON corregido. No incluyas ningún texto fuera de 
 """
 
 PROMPT_DESARROLLO = """
+**ATENCIÓN: REGLA CRÍTICA Y NO NEGOCIABLE**
+    Tu única salida debe ser el contenido final solicitado (texto en Markdown o un único bloque de código HTML). ESTÁ ABSOLUTAMENTE PROHIBIDO generar cualquier texto que analice, comente o critique tu propia salida. Frases como "Este código HTML...", "Aquí tienes una versión modificada...", "El código proporcionado...", "Puntos fuertes:", "Sugerencias:", "HTML mejorado", o cualquier tipo de análisis meta, resultarán en un fallo. Debes actuar como un redactor final, no como un revisor de código. Tu respuesta debe ser directamente el contenido, lista para ser insertada en el documento. NO expliques tu trabajo, solo hazlo.
+
+    ## REGLA DE "ZERO TOLERANCE"
+    BAJO NINGUNA CIRCUNSTANCIA debes añadir texto explicativo después de un bloque de código HTML. Tu respuesta debe terminar inmediatamente después de la etiqueta `</html>` o la última línea de texto Markdown.
+
+    **EJEMPLO DE ERROR GRAVE (PROHIBIDO):**
+    ```
+    ...texto narrativo...
+    <!DOCTYPE html>...</html>
+    El código HTML proporcionado genera una visualización atractiva... <-- ¡ESTO ESTÁ PROHIBIDO!
+    ```
+    Si generas un elemento visual, el texto narrativo va ANTES, luego el bloque HTML, y NADA MÁS.
+    
     **ATENCIÓN: REGLA CRÍTICA Y NO NEGOCIABLE**
     Tu única salida debe ser el contenido final solicitado (texto en Markdown o un único bloque de código HTML). ESTÁ ABSOLUTAMENTE PROHIBIDO generar cualquier texto que analice, comente o critique tu propia salida. Frases como "Este código HTML...", "Aquí tienes una versión modificada...", "El código proporcionado...", "Puntos fuertes:", "Sugerencias:", "HTML mejorado", o cualquier tipo de análisis meta, resultarán en un fallo. Debes actuar como un redactor final, no como un revisor de código. Tu respuesta debe ser directamente el contenido, lista para ser insertada en el documento. NO expliques tu trabajo, solo hazlo.
 
