@@ -1643,6 +1643,8 @@ import imgkit # Y esta también
 
 # REEMPLAZA TU phase_4_page ENTERA CON ESTA VERSIÓN FINAL Y ROBUSTA
 
+# REEMPLAZA TU phase_4_page ENTERA CON ESTA VERSIÓN FINALÍSIMA
+
 def phase_4_page(model):
     """Página para ejecutar el plan de prompts y generar el documento Word final."""
     st.markdown("<h3>FASE 4: Redacción y Ensamblaje Final</h3>", unsafe_allow_html=True)
@@ -1677,7 +1679,7 @@ def phase_4_page(model):
             st.warning("El plan de acción está vacío."); return
 
         generation_successful = False
-        documento = docx.Document() # Inicializamos el documento aquí
+        documento = docx.Document()
 
         try:
             with st.spinner("Iniciando redacción... Esto puede tardar varios minutos."):
@@ -1691,7 +1693,6 @@ def phase_4_page(model):
                     progress_text = f"Procesando Tarea {i+1}/{len(lista_de_prompts)}: {tarea.get('subapartado_referencia', 'N/A')}"
                     progress_bar.progress((i + 1) / len(lista_de_prompts), text=progress_text)
                     
-                    # --- Lógica de encabezados ---
                     apartado_actual = tarea.get("apartado_referencia")
                     subapartado_actual = tarea.get("subapartado_referencia")
                     if apartado_actual and apartado_actual != ultimo_apartado_escrito:
@@ -1703,47 +1704,49 @@ def phase_4_page(model):
                         documento.add_heading(subapartado_actual, level=2)
                         ultimo_subapartado_escrito = subapartado_actual
                     
-                    # --- Generación y procesamiento de la respuesta ---
                     respuesta_ia_bruta = ""
                     prompt_actual = tarea.get("prompt_para_asistente")
                     if prompt_actual:
                         response = chat_redaccion.send_message(prompt_actual)
                         respuesta_ia_bruta = response.text
-                        time.sleep(1) # Pequeña pausa para no saturar la API
+                        time.sleep(1)
                     
                     if respuesta_ia_bruta:
-                        # (La lógica de limpieza y adición al documento que ya teníamos)
-                        patron_html = re.compile(r'```html\s*(.*?)\s*```|(<div.*?>.*?</div>)|(<!DOCTYPE html>.*</html>)', re.DOTALL)
+                        # <-- ¡¡AQUÍ ESTÁ LA CORRECCIÓN CLAVE!! -->
+                        # Esta nueva regex es "greedy" (codiciosa) y captura bloques complejos de divs.
+                        patron_html = re.compile(r'```html\s*([\s\S]*?)\s*```|(<div[\s\S]*<\/div>)|(<!DOCTYPE html>[\s\S]*?<\/html>)', re.DOTALL)
                         match_html = patron_html.search(respuesta_ia_bruta)
+
                         if match_html:
                             html_puro = next(g for g in match_html.groups() if g is not None)
                             texto_narrativo_completo = respuesta_ia_bruta[:match_html.start()] + respuesta_ia_bruta[match_html.end():]
                             texto_limpio = limpiar_respuesta_final(texto_narrativo_completo)
-                            if texto_limpio: agregar_markdown_a_word(documento, texto_limpio)
+                            
+                            if texto_limpio:
+                                agregar_markdown_a_word(documento, texto_limpio)
+                            
                             image_file = html_a_imagen(wrap_html_fragment(html_puro), f"temp_img_{i}.png")
                             if image_file and os.path.exists(image_file):
                                 documento.add_picture(image_file, width=docx.shared.Inches(6.5))
                                 os.remove(image_file)
-                            else: documento.add_paragraph("[ERROR AL GENERAR IMAGEN DESDE HTML]")
+                            else:
+                                 documento.add_paragraph("[ERROR AL GENERAR IMAGEN DESDE HTML]")
                         else:
                             texto_limpio = limpiar_respuesta_final(respuesta_ia_bruta)
-                            if texto_limpio: agregar_markdown_a_word(documento, texto_limpio)
+                            if texto_limpio:
+                                agregar_markdown_a_word(documento, texto_limpio)
                 
-                # <-- CAMBIO CLAVE 1: Si el bucle termina sin errores, marcamos como exitoso
                 generation_successful = True
 
         except Exception as e:
-            # <-- CAMBIO CLAVE 2: Si algo falla en el 'try', lo capturamos aquí
             st.error(f"Ocurrió un error crítico durante la generación: {e}")
             st.warning("El proceso se ha detenido. No se generará ni guardará ningún archivo.")
         
-        # <-- CAMBIO CLAVE 3: Solo procedemos a guardar si la generación fue exitosa
         if generation_successful:
             project_name = st.session_state.selected_project['name']
             safe_project_name = re.sub(r'[\\/*?:"<>|]', "", project_name).replace(' ', '_')
             nombre_archivo_final = f"Memoria_Tecnica_{safe_project_name}.docx"
             
-            # Aquí creamos y usamos doc_io, solo si todo ha ido bien
             doc_io = io.BytesIO()
             documento.save(doc_io)
             doc_io.seek(0)
