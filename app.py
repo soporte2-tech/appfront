@@ -460,47 +460,38 @@ Tu única tarea es generar una **NUEVA VERSIÓN MEJORADA** del objeto JSON que i
 Genera únicamente el objeto JSON corregido. No incluyas ningún texto fuera de él.
 """
 
-PROMPT_DESARROLLO = """
-**ATENCIÓN: REGLA CRÍTICA Y NO NEGOCIABLE**
-    Tu única salida debe ser el contenido final solicitado (texto en Markdown o un único bloque de código HTML). ESTÁ ABSOLUTAMENTE PROHIBIDO generar cualquier texto que analice, comente o critique tu propia salida. Frases como "Este código HTML...", "Aquí tienes una versión modificada...", "El código proporcionado...", "Puntos fuertes:", "Sugerencias:", "HTML mejorado", o cualquier tipo de análisis meta, resultarán en un fallo. Debes actuar como un redactor final, no como un revisor de código. Tu respuesta debe ser directamente el contenido, lista para ser insertada en el documento. NO expliques tu trabajo, solo hazlo.
-
-    ## REGLA DE "ZERO TOLERANCE"
-    BAJO NINGUNA CIRCUNSTANCIA debes añadir texto explicativo después de un bloque de código HTML. Tu respuesta debe terminar inmediatamente después de la etiqueta `</html>` o la última línea de texto Markdown.
-
-    **EJEMPLO DE ERROR GRAVE (PROHIBIDO):**
-    ```
-    ...texto narrativo...
-    <!DOCTYPE html>...</html>
-    El código HTML proporcionado genera una visualización atractiva... <-- ¡ESTO ESTÁ PROHIBIDO!
-    ```
-    Si generas un elemento visual, el texto narrativo va ANTES, luego el bloque HTML, y NADA MÁS.
-    
+ROMPT_DESARROLLO = """
     **ATENCIÓN: REGLA CRÍTICA Y NO NEGOCIABLE**
-    Tu única salida debe ser el contenido final solicitado (texto en Markdown o un único bloque de código HTML). ESTÁ ABSOLUTAMENTE PROHIBIDO generar cualquier texto que analice, comente o critique tu propia salida. Frases como "Este código HTML...", "Aquí tienes una versión modificada...", "El código proporcionado...", "Puntos fuertes:", "Sugerencias:", "HTML mejorado", o cualquier tipo de análisis meta, resultarán en un fallo. Debes actuar como un redactor final, no como un revisor de código. Tu respuesta debe ser directamente el contenido, lista para ser insertada en el documento. NO expliques tu trabajo, solo hazlo.
+    Tu única salida debe ser el contenido final solicitado (texto en Markdown o un único bloque de código HTML). ESTÁ ABSOLUTAMENTE PROHIBIDO generar cualquier texto que analice, comente o critique tu propia salida. Frases como "Este código HTML...", "Aquí tienes una versión modificada...", o cualquier tipo de análisis meta, resultarán en un fallo. Debes actuar como un redactor final, no como un revisor de código.
+
+    ## REGLAS SOBRE ELEMENTOS VISUALES (OBLIGATORIO)
+    1.  Para CUALQUIER tipo de elemento visual (diagrama de flujo, fases, pilares, ventajas, etc.), DEBES usar una de las plantillas HTML que se proporcionan más abajo.
+    2.  ESTÁ ABSOLUTAMENTE PROHIBIDO generar cualquier otro tipo de código o sintaxis como **Mermaid**, **CSS suelto en etiquetas `<style>`**, o cualquier otro formato. Si lo haces, el resultado será incorrecto.
+    3.  Tu respuesta debe terminar inmediatamente después de la etiqueta `</html>` o la última línea de texto Markdown. NO añadas explicaciones después del código.
 
     Actúa como un consultor experto redactando una memoria técnica para una licitación pública. Tu tarea es generar el contenido para un subapartado específico de la memoria. La redacción debe ser profesional, directa y visualmente amena.
     
     El objetivo es crear un texto final y completo, no un borrador ni instrucciones para un humano. No pidas que se añada nada, genera tú todo el contenido.
 
     REGLAS DE REDACCIÓN:
-    1.  **Contenido Completo:** Genera el texto completo para el subapartado basándote en el contexto de los pliegos y el guion proporcionado.
-    2.  **Coherencia:** Haz referencia a conceptos mencionados en apartados anteriores para dar cohesión al documento. La redacción debe ser fluida y parecer escrita por un humano. 
-    2.1.  **NO REPITAS EL TÍTULO:** El título del subapartado ya ha sido añadido al documento. **Empieza tu respuesta directamente con el primer párrafo del contenido.** No incluyas el título ni uses encabezados de Markdown (ej: `## Título`).
-    3.  **Elementos Visuales:** Si el contenido se puede resumir mejor visualmente (fases, pilares, ventajas), genera un elemento visual. Para ello, **genera únicamente el código HTML completo usando una de las plantillas de abajo. ESTÁ PROHIBIDO generar cualquier otro tipo de código o sintaxis como Mermaid.** El texto introductorio al elemento visual debe ser natural, como "A continuación, se detallan las fases en el siguiente esquema:".
-    4.  **Tono y Estilo:** Utiliza un tono profesional e impersonal (tercera persona). Sé concreto, evita frases vacías y orienta el contenido a resolver los problemas del cliente.
-    5.  **Prohibiciones:**
-        -   NO uses frases de relleno como "En su compromiso con...".
-        -   NO repitas el nombre de la empresa constantemente.
-        -   NO uses mayúsculas en cada palabra de un título (incorrecto: "El Enfoque Nativo", correcto: "El enfoque nativo").
-        -   NO incluyas marcadores de posición como '[Completa aquí]'.
+    1.  Contenido Completo: Genera el texto completo para el subapartado basándote en el contexto de los pliegos y el guion proporcionado.
+    2.  NO REPITAS EL TÍTULO: El título del subapartado ya ha sido añadido al documento. Empieza tu respuesta directamente con el primer párrafo del contenido.
+    3.  Coherencia: Haz referencia a conceptos mencionados en apartados anteriores para dar cohesión al documento.
+    4.  Tono y Estilo: Utiliza un tono profesional e impersonal (tercera persona). Sé concreto, evita frases vacías y orienta el contenido a resolver los problemas del cliente.
+    5.  Prohibiciones: NO uses frases de relleno, NO repitas el nombre de la empresa, NO incluyas marcadores de posición como '[Completa aquí]'.
 
-HERRAMIENTAS VISUALES A TU DISPOSICIÓN:
-OPCIÓN A: PLANTILLA DE LISTA SIMPLE
-```html
-<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Visual Element</title><style>@import url('https://fonts.googleapis.com/css2?family=Urbanist:wght@400;600;700&display=swap');body {{{{ font-family: 'Urbanist', sans-serif; background-color: #f0f2f5; display: flex; justify-content: center; align-items: center; padding: 20px; width: 800px; box-sizing: border-box; }}}} .card {{{{ background-color: white; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); padding: 25px; width: 100%; max-width: 750px; border-top: 5px solid #0046C6; }}}} h2 {{{{ color: #0046C6; text-align: center; margin-top: 0; font-size: 24px; font-weight: 700; }}}} ul {{{{ list-style-type: none; padding: 0; }}}} li {{{{ display: flex; align-items: center; margin-bottom: 15px; font-size: 16px; color: #333; }}}} li::before {{{{ content: '✔'; color: #32CFAA; font-size: 20px; font-weight: bold; margin-right: 15px; }}}}</style></head><body><div class="card"><h2><!-- TÍTULO AQUÍ --></h2><ul><!-- LISTA DE ELEMENTOS AQUÍ --></ul></div></body></html>
-OPCIÓN B: PLANTILLA DE INFOGRAFÍA MULTI-COLUMNA
-<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Infographic Element</title><style>@import url('https://fonts.googleapis.com/css2?family=Urbanist:wght@400;600;700&display=swap');body {{{{ font-family: 'Urbanist', sans-serif; display: flex; justify-content: center; align-items: center; padding: 20px; background-color: #f8f9fa; width: 800px; box-sizing: border-box; }}}} .container {{{{ background-color: #ffffff; border: 2px dashed #e0e0e0; border-radius: 15px; padding: 25px; width: 100%; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }}}} h2 {{{{ color: #0046C6; text-align: center; font-size: 26px; font-weight: 700; margin-bottom: 25px; letter-spacing: -0.5px; }}}} .columns {{{{ display: flex; justify-content: space-around; gap: 20px; }}}} .column {{{{ flex: 1; text-align: center; padding: 15px; border-top: 4px solid; border-radius: 8px; background-color: #fdfdfd; }}}} .column-icon {{{{ width: 30px; height: 30px; border-radius: 50%; margin: 0 auto 15px auto; }}}} .column h3 {{{{ font-size: 16px; font-weight: 600; color: #333; margin-bottom: 10px; }}}} .column ul {{{{ list-style: none; padding: 0; margin: 0; text-align: left; }}}} .column li {{{{ font-size: 13px; color: #555; margin-bottom: 8px; line-height: 1.5; }}}} .color-1 {{{{ border-color: #FBC02D; }}}} .icon-1 {{{{ background-color: #FBC02D; }}}} .color-2 {{{{ border-color: #4CAF50; }}}} .icon-2 {{{{ background-color: #4CAF50; }}}} .color-3 {{{{ border-color: #90CAF9; }}}} .icon-3 {{{{ background-color: #90CAF9; }}}} .color-4 {{{{ border-color: #F44336; }}}} .icon-4 {{{{ background-color: #F44336; }}}}</style></head><body><div class="container"><h2><!-- TÍTULO --></h2><div class="columns"><div class="column color-1"><div class="column-icon icon-1"></div><h3><!-- Título Col 1 --></h3><ul><li><!-- Punto 1 --></li></ul></div><div class="column color-2"><div class="column-icon icon-2"></div><h3><!-- Título Col 2 --></h3><ul><li><!-- Punto 1 --></li></ul></div><div class="column color-3"><div class="column-icon icon-3"></div><h3><!-- Título Col 3 --></h3><ul><li><!-- Punto 1 --></li></ul></div></div></div></body></html>
-10. Debes cumplir todos los criterios pero sin mencionar que tu objetivo es cumplirlos. Es decir, debes hacer lo que se valora pero sin decir que esa sección existe para cumplir con un criterio. La redacción y el parafraseo debe ser muy elegante para demostrar un dominio y cumplimiento de los objetivos sin sonar pesado.
+    ---
+    ## HERRAMIENTAS VISUALES A TU DISPOSICIÓN (ÚNICAS PERMITIDAS)
+    
+    OPCIÓN A: PLANTILLA DE LISTA SIMPLE (Para listar ventajas, pilares, características)
+    ```html
+    <!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Visual Element</title><style>@import url('https://fonts.googleapis.com/css2?family=Urbanist:wght@400;600;700&display=swap');body { font-family: 'Urbanist', sans-serif; background-color: #f0f2f5; display: flex; justify-content: center; align-items: center; padding: 20px; width: 800px; box-sizing: border-box; } .card { background-color: white; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); padding: 25px; width: 100%; max-width: 750px; border-top: 5px solid #0046C6; } h2 { color: #0046C6; text-align: center; margin-top: 0; font-size: 24px; font-weight: 700; } ul { list-style-type: none; padding: 0; } li { display: flex; align-items: center; margin-bottom: 15px; font-size: 16px; color: #333; } li::before { content: '✔'; color: #32CFAA; font-size: 20px; font-weight: bold; margin-right: 15px; }</style></head><body><div class="card"><h2><!-- TÍTULO AQUÍ --></h2><ul><!-- LISTA DE ELEMENTOS AQUÍ --></ul></div></body></html>
+    ```
+
+    OPCIÓN B: PLANTILLA DE INFOGRAFÍA MULTI-COLUMNA (Para fases de un proyecto, pilares, áreas de actuación)
+    ```html
+    <!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale-1.0"><title>Infographic Element</title><style>@import url('https://fonts.googleapis.com/css2?family=Urbanist:wght@400;600;700&display=swap');body { font-family: 'Urbanist', sans-serif; display: flex; justify-content: center; align-items: center; padding: 20px; background-color: #f8f9fa; width: 800px; box-sizing: border-box; } .container { background-color: #ffffff; border: 2px dashed #e0e0e0; border-radius: 15px; padding: 25px; width: 100%; box-shadow: 0 4px 12px rgba(0,0,0,0.05); } h2 { color: #0046C6; text-align: center; font-size: 26px; font-weight: 700; margin-bottom: 25px; letter-spacing: -0.5px; } .columns { display: flex; justify-content: space-around; gap: 20px; } .column { flex: 1; text-align: center; padding: 15px; border-top: 4px solid; border-radius: 8px; background-color: #fdfdfd; } .column-icon { width: 30px; height: 30px; border-radius: 50%; margin: 0 auto 15px auto; } .column h3 { font-size: 16px; font-weight: 600; color: #333; margin-bottom: 10px; } .column ul { list-style: none; padding: 0; margin: 0; text-align: left; } .column li { font-size: 13px; color: #555; margin-bottom: 8px; line-height: 1.5; } .color-1 { border-color: #FBC02D; } .icon-1 { background-color: #FBC02D; } .color-2 { border-color: #4CAF50; } .icon-2 { background-color: #4CAF50; } .color-3 { border-color: #90CAF9; } .icon-3 { background-color: #90CAF9; } .color-4 { border-color: #F44336; } .icon-4 { background-color: #F44336; }</style></head><body><div class="container"><h2><!-- TÍTULO --></h2><div class="columns"><div class="column color-1"><div class="column-icon icon-1"></div><h3><!-- Título Col 1 --></h3><ul><li><!-- Punto 1 --></li></ul></div><div class="column color-2"><div class="column-icon icon-2"></div><h3><!-- Título Col 2 --></h3><ul><li><!-- Punto 1 --></li></ul></div><div class="column color-3"><div class="column-icon icon-3"></div><h3><!-- Título Col 3 --></h3><ul><li><!-- Punto 1 --></li></ul></div></div></div></body></html>
+    ```
 11. No uses recursos como el ;, los : y ese tipo de expresiones que parecen hechas con IA. Tampoco uses expresiones precedidas por -. Debes prafasear mucho. Tu texto debe parecer natural sin perder la profesionalidad.
 12. Debes establecer el mismo idioma para todas las redacciones. Este idioma debe ser el castellano.
 13. Debes poner mucho detalle en los cronogramas. Detalla bien las fases y bájalo a semanas. En las actividades detalla bien cuánto tiempo llevan y qué se va a hacer en cada una de ellas. Especifica detalladamente las actividades o los objetos de contratación propuestos para que se vean como un plan de acción más que como algo teórico, que el que evalúa el contenido pueda ver claramente qué es exactamente lo que se va a hacer o ofrecer.
