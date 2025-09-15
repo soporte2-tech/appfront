@@ -1641,6 +1641,8 @@ import imgkit # Y esta también
 
 # REEMPLAZA TU phase_4_page ENTERA CON ESTA VERSIÓN DEFINITIVA
 
+# REEMPLAZA TU phase_4_page ENTERA CON ESTA VERSIÓN FINAL Y ROBUSTA
+
 def phase_4_page(model):
     """Página para ejecutar el plan de prompts y generar el documento Word final."""
     st.markdown("<h3>FASE 4: Redacción y Ensamblaje Final</h3>", unsafe_allow_html=True)
@@ -1674,98 +1676,107 @@ def phase_4_page(model):
         if not lista_de_prompts:
             st.warning("El plan de acción está vacío."); return
 
-        with st.spinner("Iniciando redacción... Esto puede tardar varios minutos."):
-            progress_bar = st.progress(0, text="Configurando sesión de chat...")
-            documento = docx.Document()
-            chat_redaccion = model.start_chat()
-            
-            ultimo_apartado_escrito = None
-            ultimo_subapartado_escrito = None
-            
-            for i, tarea in enumerate(lista_de_prompts):
-                progress_text = f"Procesando Tarea {i+1}/{len(lista_de_prompts)}: {tarea.get('subapartado_referencia', 'N/A')}"
-                progress_bar.progress((i + 1) / len(lista_de_prompts), text=progress_text)
-                
-                apartado_actual = tarea.get("apartado_referencia")
-                subapartado_actual = tarea.get("subapartado_referencia")
+        generation_successful = False
+        documento = docx.Document() # Inicializamos el documento aquí
 
-                if apartado_actual and apartado_actual != ultimo_apartado_escrito:
-                    if ultimo_apartado_escrito is not None:
-                        documento.add_page_break()
-                    documento.add_heading(apartado_actual, level=1)
-                    ultimo_apartado_escrito = apartado_actual
-                    ultimo_subapartado_escrito = None
-
-                if subapartado_actual and subapartado_actual != ultimo_subapartado_escrito:
-                    documento.add_heading(subapartado_actual, level=2)
-                    ultimo_subapartado_escrito = subapartado_actual
+        try:
+            with st.spinner("Iniciando redacción... Esto puede tardar varios minutos."):
+                progress_bar = st.progress(0, text="Configurando sesión de chat...")
+                chat_redaccion = model.start_chat()
                 
-                respuesta_ia_bruta = None
-                prompt_actual = tarea.get("prompt_para_asistente")
-                if prompt_actual:
-                    try:
+                ultimo_apartado_escrito = None
+                ultimo_subapartado_escrito = None
+                
+                for i, tarea in enumerate(lista_de_prompts):
+                    progress_text = f"Procesando Tarea {i+1}/{len(lista_de_prompts)}: {tarea.get('subapartado_referencia', 'N/A')}"
+                    progress_bar.progress((i + 1) / len(lista_de_prompts), text=progress_text)
+                    
+                    # --- Lógica de encabezados ---
+                    apartado_actual = tarea.get("apartado_referencia")
+                    subapartado_actual = tarea.get("subapartado_referencia")
+                    if apartado_actual and apartado_actual != ultimo_apartado_escrito:
+                        if ultimo_apartado_escrito is not None: documento.add_page_break()
+                        documento.add_heading(apartado_actual, level=1)
+                        ultimo_apartado_escrito = apartado_actual
+                        ultimo_subapartado_escrito = None
+                    if subapartado_actual and subapartado_actual != ultimo_subapartado_escrito:
+                        documento.add_heading(subapartado_actual, level=2)
+                        ultimo_subapartado_escrito = subapartado_actual
+                    
+                    # --- Generación y procesamiento de la respuesta ---
+                    respuesta_ia_bruta = ""
+                    prompt_actual = tarea.get("prompt_para_asistente")
+                    if prompt_actual:
                         response = chat_redaccion.send_message(prompt_actual)
                         respuesta_ia_bruta = response.text
-                        time.sleep(1)
-                    except Exception as e:
-                        st.error(f"Fallo al procesar la tarea {i+1}: {e}")
-                        continue
-                
-                if respuesta_ia_bruta:
-                    patron_html = re.compile(r'```html\s*(.*?)\s*```|(<div.*?>.*?</div>)|(<!DOCTYPE html>.*</html>)', re.DOTALL)
-                    match_html = patron_html.search(respuesta_ia_bruta)
-
-                    if match_html:
-                        html_puro = next(g for g in match_html.groups() if g is not None)
-                        
-                        # <-- CAMBIO CLAVE: Combina el texto de antes y después del HTML
-                        texto_narrativo_completo = respuesta_ia_bruta[:match_html.start()] + respuesta_ia_bruta[match_html.end():]
-                        texto_limpio = limpiar_respuesta_final(texto_narrativo_completo)
-                        
-                        if texto_limpio:
-                            agregar_markdown_a_word(documento, texto_limpio)
-                        
-                        image_file = html_a_imagen(wrap_html_fragment(html_puro), f"temp_img_{i}.png")
-                        if image_file and os.path.exists(image_file):
-                            documento.add_picture(image_file, width=docx.shared.Inches(6.5))
-                            os.remove(image_file)
+                        time.sleep(1) # Pequeña pausa para no saturar la API
+                    
+                    if respuesta_ia_bruta:
+                        # (La lógica de limpieza y adición al documento que ya teníamos)
+                        patron_html = re.compile(r'```html\s*(.*?)\s*```|(<div.*?>.*?</div>)|(<!DOCTYPE html>.*</html>)', re.DOTALL)
+                        match_html = patron_html.search(respuesta_ia_bruta)
+                        if match_html:
+                            html_puro = next(g for g in match_html.groups() if g is not None)
+                            texto_narrativo_completo = respuesta_ia_bruta[:match_html.start()] + respuesta_ia_bruta[match_html.end():]
+                            texto_limpio = limpiar_respuesta_final(texto_narrativo_completo)
+                            if texto_limpio: agregar_markdown_a_word(documento, texto_limpio)
+                            image_file = html_a_imagen(wrap_html_fragment(html_puro), f"temp_img_{i}.png")
+                            if image_file and os.path.exists(image_file):
+                                documento.add_picture(image_file, width=docx.shared.Inches(6.5))
+                                os.remove(image_file)
+                            else: documento.add_paragraph("[ERROR AL GENERAR IMAGEN DESDE HTML]")
                         else:
-                             documento.add_paragraph("[ERROR AL GENERAR IMAGEN DESDE HTML]")
-                    else:
-                        texto_limpio = limpiar_respuesta_final(respuesta_ia_bruta)
-                        if texto_limpio:
-                            agregar_markdown_a_word(documento, texto_limpio)
+                            texto_limpio = limpiar_respuesta_final(respuesta_ia_bruta)
+                            if texto_limpio: agregar_markdown_a_word(documento, texto_limpio)
+                
+                # <-- CAMBIO CLAVE 1: Si el bucle termina sin errores, marcamos como exitoso
+                generation_successful = True
 
-            # Lógica de guardado (sin cambios)
+        except Exception as e:
+            # <-- CAMBIO CLAVE 2: Si algo falla en el 'try', lo capturamos aquí
+            st.error(f"Ocurrió un error crítico durante la generación: {e}")
+            st.warning("El proceso se ha detenido. No se generará ni guardará ningún archivo.")
+        
+        # <-- CAMBIO CLAVE 3: Solo procedemos a guardar si la generación fue exitosa
+        if generation_successful:
             project_name = st.session_state.selected_project['name']
             safe_project_name = re.sub(r'[\\/*?:"<>|]', "", project_name).replace(' ', '_')
             nombre_archivo_final = f"Memoria_Tecnica_{safe_project_name}.docx"
+            
+            # Aquí creamos y usamos doc_io, solo si todo ha ido bien
             doc_io = io.BytesIO()
-            documento.save(doc_io); doc_io.seek(0)
+            documento.save(doc_io)
+            doc_io.seek(0)
+            
             st.session_state.generated_doc_buffer = doc_io
             st.session_state.generated_doc_filename = nombre_archivo_final
+            
             with st.spinner("Guardando en Google Drive..."):
-                # Preparamos el archivo en memoria para la subida
                 word_file = io.BytesIO(doc_io.getvalue())
-                word_file.name = nombre_archivo_final # <-- Línea restaurada
-                word_file.type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document" # <-- Línea restaurada
-
-                # Buscamos si ya existe una versión antigua del archivo
-                old_file_id = find_file_by_name(service, nombre_archivo_final, docs_app_folder_id) # <-- Línea corregida y completa
-
-                # Si existe, la borramos antes de subir la nueva
+                word_file.name = nombre_archivo_final
+                word_file.type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                
+                old_file_id = find_file_by_name(service, nombre_archivo_final, docs_app_folder_id)
                 if old_file_id:
                     delete_file_from_drive(service, old_file_id)
                 
-                # Subimos el nuevo documento
                 upload_file_to_drive(service, word_file, docs_app_folder_id)
-                
+            
             st.rerun()
 
     if st.session_state.generated_doc_buffer:
-            with st.spinner("Guardando en Google Drive..."):
-                word_file = io.BytesIO(doc_io.getvalue()); word_file.name = nombre_archivo_final; word_file.type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                old_file
+        st.balloons()
+        st.success("¡Tu documento está listo!")
+        st.download_button(
+            label="🎉 Descargar Memoria Técnica Final (.docx)",
+            data=st.session_state.generated_doc_buffer,
+            file_name=st.session_state.generated_doc_filename,
+            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            use_container_width=True
+        )
+
+    st.markdown("---")
+    st.button("← Volver a Fase 3", on_click=go_to_phase3, use_container_width=True)
 # =============================================================================
 #                        LÓGICA PRINCIPAL (ROUTER)
 # =============================================================================
