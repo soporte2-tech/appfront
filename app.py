@@ -818,43 +818,38 @@ def wrap_html_fragment(html_fragment):
     """
     return full_html_template
 
-def html_a_imagen(html_string, output_filename="temp_image.png"):
+# =============================================================================
+#           FUNCIÓN CORRECTA PARA CONVERTIR HTML A IMAGEN EN MEMORIA
+# =============================================================================
+
+def html_a_imagen(html_string):
     """
-    Convierte una cadena de HTML en una imagen PNG, encontrando automáticamente
-    el ejecutable wkhtmltoimage en el entorno de Streamlit Cloud.
+    Convierte una cadena de HTML en datos de imagen PNG (bytes), sin guardar archivos.
+    Devuelve los bytes de la imagen o None si falla.
     """
     try:
-        # En Streamlit Cloud, el ejecutable se instala en una ruta accesible.
-        # 'which' es un comando de Linux para encontrar la ruta de un programa.
         path_wkhtmltoimage = os.popen('which wkhtmltoimage').read().strip()
 
         if not path_wkhtmltoimage:
             st.error("❌ El ejecutable 'wkhtmltoimage' no se encontró. Asegúrate de que 'wkhtmltopdf' está en tu packages.txt y que la app ha sido reiniciada.")
             return None
 
-        # Crea una configuración para imgkit apuntando al ejecutable encontrado.
         config = imgkit.config(wkhtmltoimage=path_wkhtmltoimage)
-        
-        # Opciones para mejorar la calidad y el tamaño de la imagen
         options = {
             'format': 'png',
             'encoding': "UTF-8",
-            'width': '800',  # Un ancho fijo para consistencia
-            'quiet': ''      # Suprime la salida de la consola
+            'width': '800',
+            'quiet': '',
+            'enable-local-file-access': None
         }
 
-        # Genera la imagen desde la cadena de HTML
-        imgkit.from_string(html_string, output_filename, config=config, options=options)
+        # Genera la imagen directamente a una variable (bytes), sin crear archivo
+        image_bytes = imgkit.from_string(html_string, False, config=config, options=options)
         
-        if os.path.exists(output_filename):
-            return output_filename
-        else:
-            st.warning(f"imgkit ejecutado pero el archivo '{output_filename}' no fue creado.")
-            return None
+        return image_bytes
 
     except Exception as e:
         st.error(f"Ocurrió un error al convertir HTML a imagen: {e}")
-        st.code(f"Path de wkhtmltoimage intentado: {os.popen('which wkhtmltoimage').read().strip()}", language="bash")
         return None
 # AÑADE ESTA NUEVA FUNCIÓN A TU SCRIPT
 def limpiar_respuesta_narrativa(texto_ia):
@@ -1736,6 +1731,7 @@ import imgkit # Y esta también
 # =============================================================================
 #           FASE 4 - VERSIÓN FINAL UNIFICADA: GENERACIÓN Y ENSAMBLAJE
 # =============================================================================
+# REEMPLAZA TU phase_4_page COMPLETA CON ESTA VERSIÓN
 
 def phase_4_page(model):
     """
@@ -1782,14 +1778,13 @@ def phase_4_page(model):
 
         try:
             cuerpo_documento = docx.Document()
-            texto_completo_generado = "" # Variable para almacenar todo el texto para la IA
+            texto_completo_generado = ""
 
             # --- PASO 1: GENERAR EL CUERPO DEL DOCUMENTO ---
             with st.spinner("Paso 1/3: Redactando el cuerpo del documento..."):
                 chat_redaccion = model.start_chat()
                 progress_bar = st.progress(0, text="Iniciando redacción...")
                 
-                # ... (Este bucle es el mismo que tenías, es correcto)
                 ultimo_apartado_escrito = None
                 ultimo_subapartado_escrito = None
                 for i, tarea in enumerate(lista_de_prompts):
@@ -1821,17 +1816,21 @@ def phase_4_page(model):
                             texto_corregido = corregir_numeracion_markdown(texto_limpio)
                             if texto_corregido:
                                 agregar_markdown_a_word(cuerpo_documento, texto_corregido)
-                            image_file = html_a_imagen(wrap_html_fragment(html_puro), f"temp_img_{i}.png")
-                            if image_file and os.path.exists(image_file):
-                                cuerpo_documento.add_picture(image_file, width=docx.shared.Inches(6.5))
-                                os.remove(image_file)
+                            
+                            # ---- INICIO DE LA CORRECCIÓN CLAVE ----
+                            image_bytes = html_a_imagen(wrap_html_fragment(html_puro))
+                            if image_bytes:
+                                image_stream = io.BytesIO(image_bytes)
+                                cuerpo_documento.add_picture(image_stream, width=docx.shared.Inches(6.5))
+                            else:
+                                cuerpo_documento.add_paragraph("[ERROR AL GENERAR IMAGEN DESDE HTML]")
+                            # ---- FIN DE LA CORRECCIÓN CLAVE ----
                         else:
                             texto_limpio = limpiar_respuesta_final(respuesta_ia_bruta)
                             texto_corregido = corregir_numeracion_markdown(texto_limpio)
                             if texto_corregido:
                                 agregar_markdown_a_word(cuerpo_documento, texto_corregido)
                 st.toast("Cuerpo del documento redactado con éxito.")
-                # Extraemos el texto completo para el siguiente paso
                 texto_completo_generado = "\n".join([p.text for p in cuerpo_documento.paragraphs if p.text.strip()])
 
             # --- PASO 2: GENERAR LA INTRODUCCIÓN ---
@@ -1843,31 +1842,22 @@ def phase_4_page(model):
             # --- PASO 3: ENSAMBLAJE FINAL ---
             with st.spinner("Paso 3/3: Ensamblando el documento final..."):
                 documento_final = docx.Document()
-
-                # 1. Añadir el ÍNDICE
                 estructura_memoria = st.session_state.generated_structure.get('estructura_memoria', [])
                 generar_indice_word(documento_final, estructura_memoria)
                 documento_final.add_page_break()
-
-                # 2. Añadir la INTRODUCCIÓN
                 documento_final.add_heading("Introducción", level=1)
                 agregar_markdown_a_word(documento_final, corregir_numeracion_markdown(introduccion_markdown))
                 documento_final.add_page_break()
-
-                # 3. Añadir el CUERPO ya generado
                 for element in cuerpo_documento.element.body:
                     documento_final.element.body.append(element)
                 
-                # --- GUARDADO Y DESCARGA ---
                 project_name = st.session_state.selected_project['name']
                 safe_project_name = re.sub(r'[\\/*?:"<>|]', "", project_name).replace(' ', '_')
                 nombre_archivo_final = f"Memoria_Tecnica_{safe_project_name}_Completa.docx"
-                
                 doc_io_final = io.BytesIO()
                 documento_final.save(doc_io_final)
                 doc_io_final.seek(0)
                 
-                # Guardamos el resultado en el estado para el botón de descarga
                 st.session_state.generated_doc_buffer = doc_io_final
                 st.session_state.generated_doc_filename = nombre_archivo_final
                 
