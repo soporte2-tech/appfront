@@ -505,6 +505,46 @@ Your response MUST be ONLY a single, valid JSON object (no ```json fences). It m
 "prompt_para_asistente": "The specific and detailed prompt for the assistant to generate the Spanish content, following all system directives."
 }}}}
 """
+
+# =============================================================================
+#           NUEVOS PROMPTS: AÑADE ESTOS A TU SCRIPT
+# =============================================================================
+
+PROMPT_GENERAR_INTRODUCCION = """
+Actúas como un estratega experto en la redacción de propuestas de licitación. Tu tarea es escribir un apartado de **Introducción** conciso y persuasivo, basándote en el contenido completo de la memoria técnica que te proporcionaré.
+
+## REGLAS ESTRICTAS:
+1.  **ENFOQUE EN LA SOLUCIÓN:** No te limites a describir el documento ("En esta memoria se describirá..."). En su lugar, resume la **propuesta de valor** y la solución que se ofrece. Empieza con fuerza.
+2.  **SÍNTESIS ESTRATÉGICA:** Lee y comprende la totalidad del documento para identificar los puntos más fuertes de la propuesta (ej: una metodología innovadora, un equipo experto, mejoras significativas) y destácalos brevemente.
+3.  **ESTRUCTURA DEL CONTENIDO:** Tras presentar la propuesta de valor, esboza de forma narrativa la estructura del documento, guiando al lector sobre lo que encontrará. (ej: "A lo largo de los siguientes apartados, se detallará la metodología de trabajo propuesta, seguida de un exhaustivo plan de trabajo y la presentación del equipo técnico adscrito al proyecto, finalizando con las mejoras adicionales que aportan un valor diferencial.").
+4.  **TONO PROFESIONAL:** Mantén un tono formal, seguro y orientado a resultados.
+5.  **SALIDA DIRECTA:** Genera únicamente el texto de la introducción en formato Markdown. No incluyas el título "Introducción" ni ningún otro comentario.
+
+**Ejemplo de inicio:** "El presente proyecto aborda la necesidad de [problema principal del cliente] a través de una solución integral que combina [pilar 1 de la solución] con [pilar 2 de la solución], garantizando [resultado clave para el cliente]."
+"""
+
+PROMPT_COHESION_FINAL = """
+Actúas como un Redactor Técnico Senior y Editor experto, con la misión de transformar un borrador bien estructurado en un documento final impecable, coherente y persuasivo. Te proporcionaré el texto completo de una memoria técnica (excluyendo la introducción).
+
+Tu tarea es reescribir y mejorar el texto aplicando las siguientes directrices de forma OBLIGATORIA:
+
+1.  **GARANTIZAR LA COHESIÓN GLOBAL (MÁXIMA PRIORIDAD):**
+    *   **Crea Puentes Lógicos:** Revisa las transiciones entre apartados y subapartados. Asegúrate de que fluyan de manera natural. Añade frases o párrafos cortos de transición si es necesario (ej: "Partiendo de la metodología Agile-Scrum descrita anteriormente, el plan de trabajo se estructura en...", "Para dar soporte a estas actividades, se utilizará el equipo técnico que se detalla a continuación...").
+    *   **Consistencia Terminológica:** Unifica la terminología. Si en un apartado se habla de "Development Team" y en otro de "Equipo de Desarrollo", elige el término más adecuado (preferiblemente en español) y úsalo de forma consistente en todo el documento.
+    *   **REFERENCIAS CRUZADAS (REQUISITO CLAVE):** Tu principal valor es conectar las ideas a lo largo del documento. Identifica activamente oportunidades para referenciar información ya mencionada. Si en el apartado 5 se retoma un concepto del apartado 1, debes indicarlo explícitamente. **Usa frases como: "Como se detalló en el apartado 1.1, la metodología Agile-Scrum...", "Este enfoque mitiga los riesgos identificados previamente en el análisis DAFO (ver apartado 2.3).", o "El equipo responsable de esta tarea es el presentado en la sección de Equipo Adscrito."**
+
+2.  **MEJORAR EL ESTILO Y LA LEGIBILIDAD:**
+    *   **Voz Activa y Directa:** Transforma frases pasivas en activas para dar más fuerza al texto.
+    *   **Claridad y Concisión:** Elimina redundancias, jerga innecesaria y frases de relleno.
+    *   **Formato y Estilo:** Asegúrate de que todos los títulos y subtítulos sigan un formato consistente de "Sentence case" (solo la primera letra del título en mayúscula, a menos que sea un nombre propio). Ej: "Diagrama de flujo del proceso" en lugar de "Diagrama de Flujo del Proceso".
+
+3.  **REGLAS DE EXCLUSIÓN (LO QUE NO DEBES HACER):**
+    *   **No Alterar Datos Clave:** No cambies datos técnicos, nombres de herramientas, cifras, duraciones de Sprints o cualquier información factual del borrador original. Tu trabajo es de estilo y cohesión, no de contenido.
+    *   **No Añadir Nueva Información:** No inventes nuevas funcionalidades o fases que no estuvieran en el texto original.
+    *   **No Incluir Meta-Comentarios:** Tu salida debe ser ÚNICAMENTE el texto final y pulido en formato Markdown. No expliques los cambios que has hecho.
+
+El objetivo final es que el documento se lea como si hubiera sido escrito por una única persona experta, con una narrativa fluida y un argumento comercial sólido y cohesionado de principio a fin.
+"""
 # =============================================================================
 #              NUEVAS FUNCIONES: AUTENTICACIÓN Y GOOGLE DRIVE
 # =============================================================================
