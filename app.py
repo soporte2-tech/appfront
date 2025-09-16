@@ -1664,10 +1664,7 @@ from pypdf import PdfReader # Asegúrate de que esta importación esté al princ
 import imgkit # Y esta también
 
 # =============================================================================
-#           FASE 4 - REDACCIÓN Y ENSAMBLAJE FINAL (VERSIÓN CORREGIDA)
-# =============================================================================
-# =============================================================================
-#           FASE 4 - VERSIÓN ACTUALIZADA PARA PREPARAR BORRADOR
+#           FASE 4 - VERSIÓN CORREGIDA Y ROBUSTA
 # =============================================================================
 
 def phase_4_page(model):
@@ -1676,6 +1673,7 @@ def phase_4_page(model):
     st.markdown("Ejecuta el plan de prompts para generar el contenido completo de la memoria técnica. Este borrador se usará como base para el refinamiento final en la siguiente fase.")
     st.markdown("---")
 
+    # --- Setup inicial (sin cambios) ---
     service = st.session_state.drive_service
     project_folder_id = st.session_state.selected_project['id']
     docs_app_folder_id = find_or_create_folder(service, "Documentos aplicación", parent_id=project_folder_id)
@@ -1695,29 +1693,24 @@ def phase_4_page(model):
     except Exception as e:
         st.error(f"Error al cargar o procesar el plan de acción: {e}"); return
 
-    if 'generated_doc_buffer' not in st.session_state: st.session_state.generated_doc_buffer = None
-    if 'generated_doc_filename' not in st.session_state: st.session_state.generated_doc_filename = ""
-
-    button_text = "🔁 Volver a Generar Borrador" if st.session_state.generated_doc_buffer else "🚀 Iniciar Redacción y Generar Borrador"
+    # --- Lógica del botón de generación (sin cambios) ---
+    button_text = "🔁 Volver a Generar Borrador" if st.session_state.get("generated_doc_buffer") else "🚀 Iniciar Redacción y Generar Borrador"
     if st.button(button_text, type="primary", use_container_width=True):
+        # ... (Todo el bloque 'if st.button(...)' hasta el 'st.rerun()' se queda exactamente igual que en la versión anterior)
         if not lista_de_prompts:
             st.warning("El plan de acción está vacío."); return
 
         generation_successful = False
         documento = docx.Document()
-
         try:
             with st.spinner("Iniciando redacción del borrador... Esto puede tardar varios minutos."):
                 chat_redaccion = model.start_chat()
                 progress_bar = st.progress(0, text="Configurando sesión de chat...")
-                
                 ultimo_apartado_escrito = None
                 ultimo_subapartado_escrito = None
-                
                 for i, tarea in enumerate(lista_de_prompts):
                     progress_text = f"Procesando Tarea {i+1}/{len(lista_de_prompts)}: {tarea.get('subapartado_referencia', 'N/A')}"
                     progress_bar.progress((i + 1) / len(lista_de_prompts), text=progress_text)
-                    
                     apartado_actual = tarea.get("apartado_referencia")
                     subapartado_actual = tarea.get("subapartado_referencia")
                     if apartado_actual and apartado_actual != ultimo_apartado_escrito:
@@ -1728,29 +1721,22 @@ def phase_4_page(model):
                     if subapartado_actual and subapartado_actual != ultimo_subapartado_escrito:
                         documento.add_heading(subapartado_actual, level=2)
                         ultimo_subapartado_escrito = subapartado_actual
-                    
                     respuesta_ia_bruta = ""
                     prompt_actual = tarea.get("prompt_para_asistente")
                     if prompt_actual:
                         response = chat_redaccion.send_message(prompt_actual)
                         respuesta_ia_bruta = response.text
                         time.sleep(1)
-                    
                     if respuesta_ia_bruta:
                         patron_html = re.compile(r'```html\s*([\s\S]*?)\s*```|(<div[\s\S]*<\/div>)|(<!DOCTYPE html>[\s\S]*?<\/html>)', re.DOTALL)
                         match_html = patron_html.search(respuesta_ia_bruta)
-
                         if match_html:
                             html_puro = next(g for g in match_html.groups() if g is not None)
                             texto_narrativo_completo = respuesta_ia_bruta[:match_html.start()] + respuesta_ia_bruta[match_html.end():]
-                            
-                            # APLICAMOS LAS NUEVAS FUNCIONES DE LIMPIEZA
                             texto_limpio = limpiar_respuesta_final(texto_narrativo_completo)
                             texto_corregido = corregir_numeracion_markdown(texto_limpio)
-                            
                             if texto_corregido:
                                 agregar_markdown_a_word(documento, texto_corregido)
-                            
                             image_file = html_a_imagen(wrap_html_fragment(html_puro), f"temp_img_{i}.png")
                             if image_file and os.path.exists(image_file):
                                 documento.add_picture(image_file, width=docx.shared.Inches(6.5))
@@ -1758,33 +1744,29 @@ def phase_4_page(model):
                             else:
                                 documento.add_paragraph("[ERROR AL GENERAR IMAGEN DESDE HTML]")
                         else:
-                            # APLICAMOS LAS NUEVAS FUNCIONES DE LIMPIEZA
                             texto_limpio = limpiar_respuesta_final(respuesta_ia_bruta)
                             texto_corregido = corregir_numeracion_markdown(texto_limpio)
                             if texto_corregido:
                                 agregar_markdown_a_word(documento, texto_corregido)
-                
                 generation_successful = True
-
         except Exception as e:
             st.error(f"Ocurrió un error crítico durante la generación del borrador: {e}")
-        
         if generation_successful:
             project_name = st.session_state.selected_project['name']
             safe_project_name = re.sub(r'[\\/*?:"<>|]', "", project_name).replace(' ', '_')
             nombre_archivo_final = f"Memoria_Tecnica_{safe_project_name}_Borrador.docx"
-            
             doc_io = io.BytesIO()
             documento.save(doc_io)
             doc_io.seek(0)
-            
             st.session_state.generated_doc_buffer = doc_io
             st.session_state.generated_doc_filename = nombre_archivo_final
-            
             st.success("¡Borrador inicial generado con éxito!")
             st.rerun()
 
-    if st.session_state.generated_doc_buffer:
+    # --- SECCIÓN DE DESCARGA Y NAVEGACIÓN (AQUÍ ESTÁ LA CORRECCIÓN) ---
+    
+    # Usamos .get() para evitar el KeyError
+    if st.session_state.get("generated_doc_buffer"):
         st.info("El borrador inicial está listo. Ahora puedes descargarlo o pasar a la fase final de refinamiento.")
         st.download_button(
             label="📄 Descargar Borrador Inicial (.docx)",
@@ -1795,101 +1777,83 @@ def phase_4_page(model):
         )
 
     st.markdown("---")
-    # NAVEGACIÓN ACTUALIZADA
     col_nav1, col_nav2 = st.columns(2)
     with col_nav1:
         st.button("← Volver a Fase 3 (Plan de Prompts)", on_click=go_to_phase3, use_container_width=True)
     with col_nav2:
-        # Botón clave para avanzar a la nueva fase. Se activa solo si hay un borrador.
-        st.button("Ir a Refinamiento Final (F5) →", on_click=go_to_phase5, use_container_width=True, type="primary", disabled=not st.session_state.generated_doc_buffer)
-
+        # Usamos .get() aquí también para el estado 'disabled'
+        st.button("Ir a Refinamiento Final (F5) →", on_click=go_to_phase5, use_container_width=True, type="primary", 
+                  disabled=not st.session_state.get("generated_doc_buffer"))
 # =============================================================================
 #           FASE 5 - VERSIÓN FINAL CON INTRODUCCIÓN Y COHESIÓN
 # =============================================================================
 
+# =============================================================================
+#           FASE 5 - VERSIÓN CORREGIDA Y ROBUSTA
+# =============================================================================
 def phase_5_page(model):
     """
     Fase final que primero genera una introducción estratégica y luego refina
     la cohesión y el estilo del documento completo para crear la versión definitiva.
     """
     st.markdown("<h3>FASE 5: Refinamiento y Ensamblaje Definitivo</h3>", unsafe_allow_html=True)
+    # ... (El resto de la descripción de la página se queda igual) ...
     st.markdown("Este es el último paso. El asistente realizará dos tareas clave:")
     st.markdown("1.  **Creará una introducción** estratégica basada en el contenido completo.")
     st.markdown("2.  **Revisará todo el documento** para mejorar el flujo, añadir referencias entre apartados y garantizar una voz coherente.")
     st.info("Este proceso analiza todo el texto y realiza dos llamadas a la IA, por lo que puede tardar varios minutos.")
     st.markdown("---")
 
-    # Comprobamos si tenemos un documento de la fase 4 para trabajar
-    if 'generated_doc_buffer' not in st.session_state or not st.session_state.generated_doc_buffer:
+    # Usamos .get() para la comprobación inicial
+    if not st.session_state.get("generated_doc_buffer"):
         st.warning("No se ha encontrado un borrador de la Fase 4. Por favor, completa la fase anterior primero.")
         if st.button("← Ir a Fase 4"): go_to_phase4(); st.rerun()
         return
 
-    if 'refined_doc_buffer' not in st.session_state: st.session_state.refined_doc_buffer = None
-
+    # --- Lógica del botón de refinamiento (sin cambios internos, ya era correcta) ---
     if st.button("✨ Iniciar Ensamblaje y Refinamiento Final", type="primary", use_container_width=True):
-        
-        # Inicializamos variables para los resultados
+        # ... (Todo el bloque 'if st.button(...)' se queda exactamente igual que en la versión anterior)
         introduccion_markdown = ""
         cuerpo_refinado_markdown = ""
         proceso_exitoso = False
-
         try:
-            # Extraer texto del documento Word generado en Fase 4
             buffer = st.session_state.generated_doc_buffer
             buffer.seek(0)
             documento_original = docx.Document(buffer)
-            # Extraemos párrafos con texto para evitar líneas vacías excesivas
             texto_completo_original = "\n".join([p.text for p in documento_original.paragraphs if p.text.strip()])
-
-            # --- PASO 1: GENERAR INTRODUCCIÓN ---
             with st.spinner("Paso 1/2: El estratega IA está redactando la introducción..."):
                 response_intro = model.generate_content([PROMPT_GENERAR_INTRODUCCION, texto_completo_original])
                 introduccion_markdown = response_intro.text
                 st.toast("Introducción generada.")
-                time.sleep(1) # Pequeña pausa
-
-            # --- PASO 2: REFINAR EL CUERPO DEL DOCUMENTO ---
+                time.sleep(1)
             with st.spinner("Paso 2/2: El editor IA está aplicando cohesión y referencias a todo el documento..."):
                 response_cohesion = model.generate_content([PROMPT_COHESION_FINAL, texto_completo_original])
                 cuerpo_refinado_markdown = response_cohesion.text
                 st.toast("Cuerpo del documento refinado.")
-
             proceso_exitoso = True
-
         except Exception as e:
             st.error(f"Ocurrió un error crítico durante el refinamiento: {e}")
-
         if proceso_exitoso:
-            # --- PASO 3: ENSAMBLAJE FINAL DEL DOCUMENTO WORD ---
             with st.spinner("Ensamblando la versión definitiva..."):
                 documento_final = docx.Document()
-                
-                # Añadir la introducción
                 documento_final.add_heading("Introducción", level=1)
                 intro_limpia = limpiar_respuesta_final(introduccion_markdown)
-                intro_corregida = corregir_numeracion_markdown(intro_limpia) # Aunque no suele haber listas, por si acaso
+                intro_corregida = corregir_numeracion_markdown(intro_limpia)
                 agregar_markdown_a_word(documento_final, intro_corregida)
-                
                 documento_final.add_page_break()
-
-                # Añadir el cuerpo refinado
                 cuerpo_limpio = limpiar_respuesta_final(cuerpo_refinado_markdown)
                 cuerpo_corregido = corregir_numeracion_markdown(cuerpo_limpio)
                 agregar_markdown_a_word(documento_final, cuerpo_corregido)
-
-                # Guardar en buffer para descarga y en Drive
                 doc_io_final = io.BytesIO()
                 documento_final.save(doc_io_final)
                 doc_io_final.seek(0)
-
                 st.session_state.refined_doc_buffer = doc_io_final
                 original_filename = st.session_state.generated_doc_filename
-                st.session_state.refined_doc_filename = original_filename.replace(".docx", "_Definitivo.docx")
-                
+                st.session_state.refined_doc_filename = original_filename.replace("_Borrador.docx", "_Definitivo.docx")
                 st.rerun()
 
-    if st.session_state.refined_doc_buffer:
+    # Usamos .get() para la sección de descarga
+    if st.session_state.get("refined_doc_buffer"):
         st.balloons()
         st.success("¡Tu memoria técnica definitiva está lista!")
         st.download_button(
@@ -1900,6 +1864,7 @@ def phase_5_page(model):
             use_container_width=True
         )
 
+    # --- Navegación final (sin cambios) ---
     st.markdown("---")
     col_nav1, col_nav2 = st.columns(2)
     with col_nav1:
