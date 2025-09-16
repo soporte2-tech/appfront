@@ -905,6 +905,35 @@ def corregir_numeracion_markdown(texto_markdown):
             lineas_corregidas.append(linea)
 
     return '\n'.join(lineas_corregidas)
+
+# AÑADE ESTA NUEVA FUNCIÓN A TUS FUNCIONES AUXILIARES
+
+def generar_indice_word(documento, estructura_memoria):
+    """
+    Añade un índice (Tabla de Contenidos) al principio de un documento de Word
+    basado en la estructura de la memoria técnica.
+    """
+    documento.add_heading("Índice", level=1)
+    
+    if not estructura_memoria:
+        documento.add_paragraph("No se encontró una estructura para generar el índice.")
+        return
+
+    for seccion in estructura_memoria:
+        apartado_titulo = seccion.get("apartado", "Apartado sin título")
+        subapartados = seccion.get("subapartados", [])
+        
+        # Añade el apartado principal
+        p = documento.add_paragraph()
+        p.add_run(apartado_titulo).bold = True
+        
+        # Añade los subapartados con sangría
+        if subapartados:
+            for sub in subapartados:
+                # Usamos un estilo de párrafo con sangría si existe, o añadimos espacios
+                p_sub = documento.add_paragraph(f"    {sub}")
+
+    st.toast("Índice generado en el documento.")
 # =============================================================================
 #           BLOQUE UNIFICADO: NAVEGACIÓN Y GESTIÓN DE ESTADO
 # =============================================================================
@@ -1815,74 +1844,85 @@ def phase_4_page(model):
         st.button("Ir a Refinamiento Final (F5) →", on_click=go_to_phase5, use_container_width=True, type="primary", 
                   disabled=not st.session_state.get("generated_doc_buffer"))
 # =============================================================================
-#           FASE 5 - VERSIÓN FINAL CON INTRODUCCIÓN Y COHESIÓN
+#           FASE 5 - VERSIÓN FINAL SEGURA Y CON ÍNDICE
 # =============================================================================
 
-# =============================================================================
-#           FASE 5 - VERSIÓN CORREGIDA Y ROBUSTA
-# =============================================================================
 def phase_5_page(model):
     """
-    Fase final que primero genera una introducción estratégica y luego refina
-    la cohesión y el estilo del documento completo para crear la versión definitiva.
+    Fase final que ensambla el documento definitivo:
+    1. Crea un Índice automático.
+    2. Genera una Introducción estratégica.
+    3. Añade el cuerpo completo del borrador de la Fase 4 sin modificarlo.
     """
-    st.markdown("<h3>FASE 5: Refinamiento y Ensamblaje Definitivo</h3>", unsafe_allow_html=True)
-    # ... (El resto de la descripción de la página se queda igual) ...
-    st.markdown("Este es el último paso. El asistente realizará dos tareas clave:")
-    st.markdown("1.  **Creará una introducción** estratégica basada en el contenido completo.")
-    st.markdown("2.  **Revisará todo el documento** para mejorar el flujo, añadir referencias entre apartados y garantizar una voz coherente.")
-    st.info("Este proceso analiza todo el texto y realiza dos llamadas a la IA, por lo que puede tardar varios minutos.")
+    st.markdown("<h3>FASE 5: Ensamblaje del Documento Final</h3>", unsafe_allow_html=True)
+    st.markdown("Este es el último paso. El asistente ensamblará la versión final y definitiva de tu memoria técnica.")
+    st.info("El proceso tomará el borrador de la Fase 4, le añadirá un índice y una nueva introducción estratégica.")
     st.markdown("---")
 
-    # Usamos .get() para la comprobación inicial
+    # Comprobación de que existen los datos necesarios de fases anteriores
     if not st.session_state.get("generated_doc_buffer"):
         st.warning("No se ha encontrado un borrador de la Fase 4. Por favor, completa la fase anterior primero.")
         if st.button("← Ir a Fase 4"): go_to_phase4(); st.rerun()
         return
+        
+    if not st.session_state.get("generated_structure"):
+        st.warning("No se ha encontrado la estructura del proyecto. Vuelve a la Fase 1.")
+        if st.button("← Ir a Fase 1"): go_to_phase1(); st.rerun()
+        return
 
-    # --- Lógica del botón de refinamiento (sin cambios internos, ya era correcta) ---
-    if st.button("✨ Iniciar Ensamblaje y Refinamiento Final", type="primary", use_container_width=True):
-        # ... (Todo el bloque 'if st.button(...)' se queda exactamente igual que en la versión anterior)
-        introduccion_markdown = ""
-        cuerpo_refinado_markdown = ""
-        proceso_exitoso = False
+    if st.button("🚀 Ensamblar Documento Final con Índice e Introducción", type="primary", use_container_width=True):
+        
         try:
-            buffer = st.session_state.generated_doc_buffer
-            buffer.seek(0)
-            documento_original = docx.Document(buffer)
-            texto_completo_original = "\n".join([p.text for p in documento_original.paragraphs if p.text.strip()])
-            with st.spinner("Paso 1/2: El estratega IA está redactando la introducción..."):
-                response_intro = model.generate_content([PROMPT_GENERAR_INTRODUCCION, texto_completo_original])
-                introduccion_markdown = response_intro.text
-                st.toast("Introducción generada.")
-                time.sleep(1)
-            with st.spinner("Paso 2/2: El editor IA está aplicando cohesión y referencias a todo el documento..."):
-                response_cohesion = model.generate_content([PROMPT_COHESION_FINAL, texto_completo_original])
-                cuerpo_refinado_markdown = response_cohesion.text
-                st.toast("Cuerpo del documento refinado.")
-            proceso_exitoso = True
-        except Exception as e:
-            st.error(f"Ocurrió un error crítico durante el refinamiento: {e}")
-        if proceso_exitoso:
             with st.spinner("Ensamblando la versión definitiva..."):
+                # --- PIEZA 1: EL CUERPO DEL DOCUMENTO (DE LA FASE 4) ---
+                # Leemos el borrador de la Fase 4 para tener su contenido
+                buffer_fase4 = st.session_state.generated_doc_buffer
+                buffer_fase4.seek(0)
+                documento_fase4 = docx.Document(buffer_fase4)
+                
+                # Extraemos el texto completo para que la IA genere la introducción
+                texto_completo_original = "\n".join([p.text for p in documento_fase4.paragraphs if p.text.strip()])
+
+                # --- PIEZA 2: LA INTRODUCCIÓN (GENERADA POR IA) ---
+                st.toast("Generando introducción estratégica...")
+                response_intro = model.generate_content([PROMPT_GENERAR_INTRODUCCION, texto_completo_original])
+                introduccion_markdown = limpiar_respuesta_final(response_intro.text)
+
+                # --- ENSAMBLAJE FINAL ---
                 documento_final = docx.Document()
-                documento_final.add_heading("Introducción", level=1)
-                intro_limpia = limpiar_respuesta_final(introduccion_markdown)
-                intro_corregida = corregir_numeracion_markdown(intro_limpia)
-                agregar_markdown_a_word(documento_final, intro_corregida)
+                
+                # 1. Añadir el ÍNDICE
+                estructura_memoria = st.session_state.generated_structure.get('estructura_memoria', [])
+                generar_indice_word(documento_final, estructura_memoria)
                 documento_final.add_page_break()
-                cuerpo_limpio = limpiar_respuesta_final(cuerpo_refinado_markdown)
-                cuerpo_corregido = corregir_numeracion_markdown(cuerpo_limpio)
-                agregar_markdown_a_word(documento_final, cuerpo_corregido)
+                
+                # 2. Añadir la INTRODUCCIÓN
+                documento_final.add_heading("Introducción", level=1)
+                agregar_markdown_a_word(documento_final, corregir_numeracion_markdown(introduccion_markdown))
+                documento_final.add_page_break()
+                
+                # 3. Añadir el CUERPO del documento de la Fase 4
+                st.toast("Añadiendo cuerpo del documento...")
+                # Copiamos cada elemento del borrador original al documento final
+                for element in documento_fase4.element.body:
+                    documento_final.element.body.append(element)
+
+                # --- GUARDADO Y DESCARGA ---
                 doc_io_final = io.BytesIO()
                 documento_final.save(doc_io_final)
                 doc_io_final.seek(0)
+
                 st.session_state.refined_doc_buffer = doc_io_final
                 original_filename = st.session_state.generated_doc_filename
-                st.session_state.refined_doc_filename = original_filename.replace("_Borrador.docx", "_Definitivo.docx")
+                st.session_state.refined_doc_filename = original_filename.replace("_Borrador.docx", "_Definitivo_Con_Indice.docx")
+                
+                st.success("¡Documento final ensamblado con éxito!")
                 st.rerun()
 
-    # Usamos .get() para la sección de descarga
+        except Exception as e:
+            st.error(f"Ocurrió un error crítico durante el ensamblaje final: {e}")
+
+    # Lógica de descarga (usando .get para seguridad)
     if st.session_state.get("refined_doc_buffer"):
         st.balloons()
         st.success("¡Tu memoria técnica definitiva está lista!")
@@ -1894,11 +1934,10 @@ def phase_5_page(model):
             use_container_width=True
         )
 
-    # --- Navegación final (sin cambios) ---
     st.markdown("---")
     col_nav1, col_nav2 = st.columns(2)
     with col_nav1:
-        st.button("← Volver a Fase 4 (Borrador Inicial)", on_click=go_to_phase4, use_container_width=True)
+        st.button("← Volver a Fase 4 (Borrador)", on_click=go_to_phase4, use_container_width=True)
     with col_nav2:
         st.button("↩️ Volver a Selección de Proyecto", on_click=back_to_project_selection_and_cleanup, use_container_width=True)
 # =============================================================================
