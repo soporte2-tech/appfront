@@ -1903,17 +1903,3 @@ else:
     elif st.session_state.page == 'phase_5': # <-- NUEVA LÍNEA
         phase_5_page(model)               # <-- NUEVA LÍNEA
 
-# AÑADE ESTO A TU SECCIÓN DE NAVEGACIÓN Y GESTIÓN DE ESTADO
-
-# ... (junto a tus otras funciones go_to_... )
-def go_to_phase5(): st.session_state.page = 'phase_5'
-
-# ... (en la misma sección, actualiza tu función de limpieza)
-def back_to_project_selection_and_cleanup():
-    # Asegúrate de que las nuevas variables de estado se limpien también
-    for key in ['generated_structure', 'word_file', 'uploaded_template', 
-                'uploaded_pliegos', 'selected_project', 'generated_doc_buffer', 
-                'refined_doc_buffer', 'generated_doc_filename', 'refined_doc_filename']:
-        if key in st.session_state: 
-            del st.session_state[key]
-    go_to_project_selection()
