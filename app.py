@@ -878,7 +878,7 @@ def limpiar_respuesta_narrativa(texto_ia):
 # =============================================================================
 #           BLOQUE UNIFICADO: NAVEGACIÓN Y GESTIÓN DE ESTADO
 # =============================================================================
-# Coloca este bloque ANTES de la definición de CUALQUIER def phase_..._page(model):
+# Este bloque debe estar ANTES de la definición de `def landing_page():`
 
 # --- Inicialización de Estado ---
 if 'page' not in st.session_state: st.session_state.page = 'landing'
@@ -911,7 +911,7 @@ def back_to_project_selection_and_cleanup():
         if key in st.session_state:
             del st.session_state[key]
     go_to_project_selection()
-
+    
 def handle_full_regeneration(model):
     """
     Función centralizada que genera un índice completamente nuevo desde cero
