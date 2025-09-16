@@ -1649,17 +1649,14 @@ import imgkit # Y esta también
 # =============================================================================
 #           FASE 4 - REDACCIÓN Y ENSAMBLAJE FINAL (VERSIÓN CORREGIDA)
 # =============================================================================
-
-# REEMPLAZA TU phase_4_page ENTERA CON ESTA VERSIÓN DEFINITIVA
-
-# REEMPLAZA TU phase_4_page ENTERA CON ESTA VERSIÓN FINAL Y ROBUSTA
-
-# REEMPLAZA TU phase_4_page ENTERA CON ESTA VERSIÓN FINALÍSIMA
+# =============================================================================
+#           FASE 4 - VERSIÓN ACTUALIZADA PARA PREPARAR BORRADOR
+# =============================================================================
 
 def phase_4_page(model):
-    """Página para ejecutar el plan de prompts y generar el documento Word final."""
-    st.markdown("<h3>FASE 4: Redacción y Ensamblaje Final</h3>", unsafe_allow_html=True)
-    st.markdown("Ejecuta el plan de prompts para generar el contenido de la memoria técnica y descargar el documento final.")
+    """Página para ejecutar el plan de prompts y generar el borrador inicial del documento Word."""
+    st.markdown("<h3>FASE 4: Redacción del Borrador Inicial</h3>", unsafe_allow_html=True)
+    st.markdown("Ejecuta el plan de prompts para generar el contenido completo de la memoria técnica. Este borrador se usará como base para el refinamiento final en la siguiente fase.")
     st.markdown("---")
 
     service = st.session_state.drive_service
@@ -1677,14 +1674,14 @@ def phase_4_page(model):
         plan_de_accion = json.loads(json_bytes.decode('utf-8'))
         lista_de_prompts = plan_de_accion.get("plan_de_prompts", [])
         lista_de_prompts.sort(key=lambda x: x.get('prompt_id', ''))
-        st.success(f"✔️ Plan de acción cargado y ordenado. Se ejecutarán {len(lista_de_prompts)} prompts.")
+        st.success(f"✔️ Plan de acción cargado. Se ejecutarán {len(lista_de_prompts)} prompts para crear el borrador.")
     except Exception as e:
         st.error(f"Error al cargar o procesar el plan de acción: {e}"); return
 
     if 'generated_doc_buffer' not in st.session_state: st.session_state.generated_doc_buffer = None
     if 'generated_doc_filename' not in st.session_state: st.session_state.generated_doc_filename = ""
 
-    button_text = "🔁 Volver a Generar Documento" if st.session_state.generated_doc_buffer else "🚀 Iniciar Redacción y Generar Documento"
+    button_text = "🔁 Volver a Generar Borrador" if st.session_state.generated_doc_buffer else "🚀 Iniciar Redacción y Generar Borrador"
     if st.button(button_text, type="primary", use_container_width=True):
         if not lista_de_prompts:
             st.warning("El plan de acción está vacío."); return
@@ -1693,9 +1690,9 @@ def phase_4_page(model):
         documento = docx.Document()
 
         try:
-            with st.spinner("Iniciando redacción... Esto puede tardar varios minutos."):
-                progress_bar = st.progress(0, text="Configurando sesión de chat...")
+            with st.spinner("Iniciando redacción del borrador... Esto puede tardar varios minutos."):
                 chat_redaccion = model.start_chat()
+                progress_bar = st.progress(0, text="Configurando sesión de chat...")
                 
                 ultimo_apartado_escrito = None
                 ultimo_subapartado_escrito = None
@@ -1723,40 +1720,42 @@ def phase_4_page(model):
                         time.sleep(1)
                     
                     if respuesta_ia_bruta:
-                        # <-- ¡¡AQUÍ ESTÁ LA CORRECCIÓN CLAVE!! -->
-                        # Esta nueva regex es "greedy" (codiciosa) y captura bloques complejos de divs.
                         patron_html = re.compile(r'```html\s*([\s\S]*?)\s*```|(<div[\s\S]*<\/div>)|(<!DOCTYPE html>[\s\S]*?<\/html>)', re.DOTALL)
                         match_html = patron_html.search(respuesta_ia_bruta)
 
                         if match_html:
                             html_puro = next(g for g in match_html.groups() if g is not None)
                             texto_narrativo_completo = respuesta_ia_bruta[:match_html.start()] + respuesta_ia_bruta[match_html.end():]
-                            texto_limpio = limpiar_respuesta_final(texto_narrativo_completo)
                             
-                            if texto_limpio:
-                                agregar_markdown_a_word(documento, texto_limpio)
+                            # APLICAMOS LAS NUEVAS FUNCIONES DE LIMPIEZA
+                            texto_limpio = limpiar_respuesta_final(texto_narrativo_completo)
+                            texto_corregido = corregir_numeracion_markdown(texto_limpio)
+                            
+                            if texto_corregido:
+                                agregar_markdown_a_word(documento, texto_corregido)
                             
                             image_file = html_a_imagen(wrap_html_fragment(html_puro), f"temp_img_{i}.png")
                             if image_file and os.path.exists(image_file):
                                 documento.add_picture(image_file, width=docx.shared.Inches(6.5))
                                 os.remove(image_file)
                             else:
-                                 documento.add_paragraph("[ERROR AL GENERAR IMAGEN DESDE HTML]")
+                                documento.add_paragraph("[ERROR AL GENERAR IMAGEN DESDE HTML]")
                         else:
+                            # APLICAMOS LAS NUEVAS FUNCIONES DE LIMPIEZA
                             texto_limpio = limpiar_respuesta_final(respuesta_ia_bruta)
-                            if texto_limpio:
-                                agregar_markdown_a_word(documento, texto_limpio)
+                            texto_corregido = corregir_numeracion_markdown(texto_limpio)
+                            if texto_corregido:
+                                agregar_markdown_a_word(documento, texto_corregido)
                 
                 generation_successful = True
 
         except Exception as e:
-            st.error(f"Ocurrió un error crítico durante la generación: {e}")
-            st.warning("El proceso se ha detenido. No se generará ni guardará ningún archivo.")
+            st.error(f"Ocurrió un error crítico durante la generación del borrador: {e}")
         
         if generation_successful:
             project_name = st.session_state.selected_project['name']
             safe_project_name = re.sub(r'[\\/*?:"<>|]', "", project_name).replace(' ', '_')
-            nombre_archivo_final = f"Memoria_Tecnica_{safe_project_name}.docx"
+            nombre_archivo_final = f"Memoria_Tecnica_{safe_project_name}_Borrador.docx"
             
             doc_io = io.BytesIO()
             documento.save(doc_io)
@@ -1765,24 +1764,13 @@ def phase_4_page(model):
             st.session_state.generated_doc_buffer = doc_io
             st.session_state.generated_doc_filename = nombre_archivo_final
             
-            with st.spinner("Guardando en Google Drive..."):
-                word_file = io.BytesIO(doc_io.getvalue())
-                word_file.name = nombre_archivo_final
-                word_file.type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                
-                old_file_id = find_file_by_name(service, nombre_archivo_final, docs_app_folder_id)
-                if old_file_id:
-                    delete_file_from_drive(service, old_file_id)
-                
-                upload_file_to_drive(service, word_file, docs_app_folder_id)
-            
+            st.success("¡Borrador inicial generado con éxito!")
             st.rerun()
 
     if st.session_state.generated_doc_buffer:
-        st.balloons()
-        st.success("¡Tu documento está listo!")
+        st.info("El borrador inicial está listo. Ahora puedes descargarlo o pasar a la fase final de refinamiento.")
         st.download_button(
-            label="🎉 Descargar Memoria Técnica Final (.docx)",
+            label="📄 Descargar Borrador Inicial (.docx)",
             data=st.session_state.generated_doc_buffer,
             file_name=st.session_state.generated_doc_filename,
             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -1790,7 +1778,117 @@ def phase_4_page(model):
         )
 
     st.markdown("---")
-    st.button("← Volver a Fase 3", on_click=go_to_phase3, use_container_width=True)
+    # NAVEGACIÓN ACTUALIZADA
+    col_nav1, col_nav2 = st.columns(2)
+    with col_nav1:
+        st.button("← Volver a Fase 3 (Plan de Prompts)", on_click=go_to_phase3, use_container_width=True)
+    with col_nav2:
+        # Botón clave para avanzar a la nueva fase. Se activa solo si hay un borrador.
+        st.button("Ir a Refinamiento Final (F5) →", on_click=go_to_phase5, use_container_width=True, type="primary", disabled=not st.session_state.generated_doc_buffer)
+
+# =============================================================================
+#           FASE 5 - VERSIÓN FINAL CON INTRODUCCIÓN Y COHESIÓN
+# =============================================================================
+
+def phase_5_page(model):
+    """
+    Fase final que primero genera una introducción estratégica y luego refina
+    la cohesión y el estilo del documento completo para crear la versión definitiva.
+    """
+    st.markdown("<h3>FASE 5: Refinamiento y Ensamblaje Definitivo</h3>", unsafe_allow_html=True)
+    st.markdown("Este es el último paso. El asistente realizará dos tareas clave:")
+    st.markdown("1.  **Creará una introducción** estratégica basada en el contenido completo.")
+    st.markdown("2.  **Revisará todo el documento** para mejorar el flujo, añadir referencias entre apartados y garantizar una voz coherente.")
+    st.info("Este proceso analiza todo el texto y realiza dos llamadas a la IA, por lo que puede tardar varios minutos.")
+    st.markdown("---")
+
+    # Comprobamos si tenemos un documento de la fase 4 para trabajar
+    if 'generated_doc_buffer' not in st.session_state or not st.session_state.generated_doc_buffer:
+        st.warning("No se ha encontrado un borrador de la Fase 4. Por favor, completa la fase anterior primero.")
+        if st.button("← Ir a Fase 4"): go_to_phase4(); st.rerun()
+        return
+
+    if 'refined_doc_buffer' not in st.session_state: st.session_state.refined_doc_buffer = None
+
+    if st.button("✨ Iniciar Ensamblaje y Refinamiento Final", type="primary", use_container_width=True):
+        
+        # Inicializamos variables para los resultados
+        introduccion_markdown = ""
+        cuerpo_refinado_markdown = ""
+        proceso_exitoso = False
+
+        try:
+            # Extraer texto del documento Word generado en Fase 4
+            buffer = st.session_state.generated_doc_buffer
+            buffer.seek(0)
+            documento_original = docx.Document(buffer)
+            # Extraemos párrafos con texto para evitar líneas vacías excesivas
+            texto_completo_original = "\n".join([p.text for p in documento_original.paragraphs if p.text.strip()])
+
+            # --- PASO 1: GENERAR INTRODUCCIÓN ---
+            with st.spinner("Paso 1/2: El estratega IA está redactando la introducción..."):
+                response_intro = model.generate_content([PROMPT_GENERAR_INTRODUCCION, texto_completo_original])
+                introduccion_markdown = response_intro.text
+                st.toast("Introducción generada.")
+                time.sleep(1) # Pequeña pausa
+
+            # --- PASO 2: REFINAR EL CUERPO DEL DOCUMENTO ---
+            with st.spinner("Paso 2/2: El editor IA está aplicando cohesión y referencias a todo el documento..."):
+                response_cohesion = model.generate_content([PROMPT_COHESION_FINAL, texto_completo_original])
+                cuerpo_refinado_markdown = response_cohesion.text
+                st.toast("Cuerpo del documento refinado.")
+
+            proceso_exitoso = True
+
+        except Exception as e:
+            st.error(f"Ocurrió un error crítico durante el refinamiento: {e}")
+
+        if proceso_exitoso:
+            # --- PASO 3: ENSAMBLAJE FINAL DEL DOCUMENTO WORD ---
+            with st.spinner("Ensamblando la versión definitiva..."):
+                documento_final = docx.Document()
+                
+                # Añadir la introducción
+                documento_final.add_heading("Introducción", level=1)
+                intro_limpia = limpiar_respuesta_final(introduccion_markdown)
+                intro_corregida = corregir_numeracion_markdown(intro_limpia) # Aunque no suele haber listas, por si acaso
+                agregar_markdown_a_word(documento_final, intro_corregida)
+                
+                documento_final.add_page_break()
+
+                # Añadir el cuerpo refinado
+                cuerpo_limpio = limpiar_respuesta_final(cuerpo_refinado_markdown)
+                cuerpo_corregido = corregir_numeracion_markdown(cuerpo_limpio)
+                agregar_markdown_a_word(documento_final, cuerpo_corregido)
+
+                # Guardar en buffer para descarga y en Drive
+                doc_io_final = io.BytesIO()
+                documento_final.save(doc_io_final)
+                doc_io_final.seek(0)
+
+                st.session_state.refined_doc_buffer = doc_io_final
+                original_filename = st.session_state.generated_doc_filename
+                st.session_state.refined_doc_filename = original_filename.replace(".docx", "_Definitivo.docx")
+                
+                st.rerun()
+
+    if st.session_state.refined_doc_buffer:
+        st.balloons()
+        st.success("¡Tu memoria técnica definitiva está lista!")
+        st.download_button(
+            label="🏆 Descargar Versión Definitiva (.docx)",
+            data=st.session_state.refined_doc_buffer,
+            file_name=st.session_state.refined_doc_filename,
+            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            use_container_width=True
+        )
+
+    st.markdown("---")
+    col_nav1, col_nav2 = st.columns(2)
+    with col_nav1:
+        st.button("← Volver a Fase 4 (Borrador Inicial)", on_click=go_to_phase4, use_container_width=True)
+    with col_nav2:
+        st.button("↩️ Volver a Selección de Proyecto", on_click=back_to_project_selection_and_cleanup, use_container_width=True)
 # =============================================================================
 #                        LÓGICA PRINCIPAL (ROUTER)
 # =============================================================================
