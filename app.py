@@ -1904,7 +1904,8 @@ else:
     except Exception as e:
         st.error(f"Error al configurar la API de Gemini. Verifica tu 'GEMINI_API_KEY' en los secrets. Detalle: {e}")
         st.stop()
-
+        
+    # El router ahora incluye la nueva Fase 5
     if st.session_state.page == 'landing' or st.session_state.page == 'project_selection':
         project_selection_page()
     elif st.session_state.page == 'phase_1':
@@ -1917,3 +1918,22 @@ else:
         phase_3_page(model)
     elif st.session_state.page == 'phase_4':
         phase_4_page(model)
+    elif st.session_state.page == 'phase_5': # <-- NUEVA LÍNEA
+        phase_5_page(model)               # <-- NUEVA LÍNEA
+Y no olvides añadir las nuevas funciones de navegación y limpieza de estado que mencioné en la respuesta anterior si aún no lo has hecho. Te las incluyo aquí de nuevo por si acaso:
+code
+Python
+# AÑADE ESTO A TU SECCIÓN DE NAVEGACIÓN Y GESTIÓN DE ESTADO
+
+# ... (junto a tus otras funciones go_to_... )
+def go_to_phase5(): st.session_state.page = 'phase_5'
+
+# ... (en la misma sección, actualiza tu función de limpieza)
+def back_to_project_selection_and_cleanup():
+    # Asegúrate de que las nuevas variables de estado se limpien también
+    for key in ['generated_structure', 'word_file', 'uploaded_template', 
+                'uploaded_pliegos', 'selected_project', 'generated_doc_buffer', 
+                'refined_doc_buffer', 'generated_doc_filename', 'refined_doc_filename']:
+        if key in st.session_state: 
+            del st.session_state[key]
+    go_to_project_selection()
