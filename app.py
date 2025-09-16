@@ -874,7 +874,37 @@ def limpiar_respuesta_narrativa(texto_ia):
         texto_limpio = re.sub(patron, '', texto_limpio, flags=re.IGNORECASE | re.MULTILINE).strip()
 
     return texto_limpio
+def corregir_numeracion_markdown(texto_markdown):
+    """
+    Recorre un texto en Markdown y corrige las listas numeradas para que
+    siempre empiecen en 1 y sean consecutivas.
+    """
+    lineas_corregidas = []
+    contador_lista = 0
+    en_lista_numerada = False
 
+    for linea in texto_markdown.split('\n'):
+        # Usamos una regex para detectar si la línea empieza como un item de lista numerada
+        match = re.match(r'^\s*\d+\.\s+', linea)
+        if match:
+            if not en_lista_numerada:
+                # Si es el primer item de una nueva lista, reiniciamos el contador
+                en_lista_numerada = True
+                contador_lista = 1
+            else:
+                # Si ya estábamos en una lista, incrementamos
+                contador_lista += 1
+
+            # Reemplazamos el número original por el correcto
+            texto_del_item = linea[match.end():]
+            lineas_corregidas.append(f"{contador_lista}. {texto_del_item}")
+        else:
+            # Si la línea no es un item de lista, se resetea el estado
+            en_lista_numerada = False
+            contador_lista = 0
+            lineas_corregidas.append(linea)
+
+    return '\n'.join(lineas_corregidas)
 # =============================================================================
 #           BLOQUE UNIFICADO: NAVEGACIÓN Y GESTIÓN DE ESTADO
 # =============================================================================
