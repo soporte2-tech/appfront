@@ -1920,9 +1920,7 @@ else:
         phase_4_page(model)
     elif st.session_state.page == 'phase_5': # <-- NUEVA LÍNEA
         phase_5_page(model)               # <-- NUEVA LÍNEA
-Y no olvides añadir las nuevas funciones de navegación y limpieza de estado que mencioné en la respuesta anterior si aún no lo has hecho. Te las incluyo aquí de nuevo por si acaso:
-code
-Python
+
 # AÑADE ESTO A TU SECCIÓN DE NAVEGACIÓN Y GESTIÓN DE ESTADO
 
 # ... (junto a tus otras funciones go_to_... )
