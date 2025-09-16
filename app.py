@@ -875,24 +875,41 @@ def limpiar_respuesta_narrativa(texto_ia):
 
     return texto_limpio
 
-# --- NAVEGACIÓN Y GESTIÓN DE ESTADO (actualizada) ---
+# =============================================================================
+#           BLOQUE UNIFICADO: NAVEGACIÓN Y GESTIÓN DE ESTADO
+# =============================================================================
+# Coloca este bloque ANTES de la definición de CUALQUIER def phase_..._page(model):
+
+# --- Inicialización de Estado ---
 if 'page' not in st.session_state: st.session_state.page = 'landing'
 if 'credentials' not in st.session_state: st.session_state.credentials = None
 if 'drive_service' not in st.session_state: st.session_state.drive_service = None
 if 'selected_project' not in st.session_state: st.session_state.selected_project = None
+if 'generated_doc_buffer' not in st.session_state: st.session_state.generated_doc_buffer = None
+if 'generated_doc_filename' not in st.session_state: st.session_state.generated_doc_filename = ""
+if 'refined_doc_buffer' not in st.session_state: st.session_state.refined_doc_buffer = None
+if 'refined_doc_filename' not in st.session_state: st.session_state.refined_doc_filename = ""
 
-def go_to_project_selection(): st.session_state.page = 'project_selection'
+# --- Funciones de Navegación ---
 def go_to_landing(): st.session_state.page = 'landing'
+def go_to_project_selection(): st.session_state.page = 'project_selection'
 def go_to_phase1(): st.session_state.page = 'phase_1'
 def go_to_phase1_results(): st.session_state.page = 'phase_1_results'
-def go_to_phase2():
-    st.session_state.page = 'phase_2'
+def go_to_phase2(): st.session_state.page = 'phase_2'
 def go_to_phase3(): st.session_state.page = 'phase_3'
-def go_to_phase4(): st.session_state.page = 'phase_4' # <-- AÑADE ESTA LÍNEA
+def go_to_phase4(): st.session_state.page = 'phase_4'
+def go_to_phase5(): st.session_state.page = 'phase_5'
 
+# --- Función de Limpieza ---
 def back_to_project_selection_and_cleanup():
-    for key in ['generated_structure', 'word_file', 'uploaded_template', 'uploaded_pliegos', 'selected_project']:
-        if key in st.session_state: del st.session_state[key]
+    keys_to_clear = [
+        'generated_structure', 'word_file', 'uploaded_template', 
+        'uploaded_pliegos', 'selected_project', 'generated_doc_buffer', 
+        'refined_doc_buffer', 'generated_doc_filename', 'refined_doc_filename'
+    ]
+    for key in keys_to_clear:
+        if key in st.session_state:
+            del st.session_state[key]
     go_to_project_selection()
 
 def handle_full_regeneration(model):
