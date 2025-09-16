@@ -522,28 +522,35 @@ Actúas como un estratega experto en la redacción de propuestas de licitación.
 
 **Ejemplo de inicio:** "El presente proyecto aborda la necesidad de [problema principal del cliente] a través de una solución integral que combina [pilar 1 de la solución] con [pilar 2 de la solución], garantizando [resultado clave para el cliente]."
 """
+# REEMPLAZA TU PROMPT_COHESION_FINAL CON ESTA VERSIÓN
 
 PROMPT_COHESION_FINAL = """
-Actúas como un Redactor Técnico Senior y Editor experto, con la misión de transformar un borrador bien estructurado en un documento final impecable, coherente y persuasivo. Te proporcionaré el texto completo de una memoria técnica (excluyendo la introducción).
+Actúas como un Editor Técnico experto. Tu única misión es mejorar la cohesión y el flujo de un borrador de memoria técnica que te proporcionaré. NO debes reescribir apartados enteros ni eliminar contenido. Tu trabajo es puramente de conexión y pulido.
 
-Tu tarea es reescribir y mejorar el texto aplicando las siguientes directrices de forma OBLIGATORIA:
+Te proporcionaré el texto completo de un borrador. Debes devolver una versión mejorada del texto completo aplicando ÚNICAMENTE las siguientes reglas:
 
-1.  **GARANTIZAR LA COHESIÓN GLOBAL (MÁXIMA PRIORIDAD):**
-    *   **Crea Puentes Lógicos:** Revisa las transiciones entre apartados y subapartados. Asegúrate de que fluyan de manera natural. Añade frases o párrafos cortos de transición si es necesario (ej: "Partiendo de la metodología Agile-Scrum descrita anteriormente, el plan de trabajo se estructura en...", "Para dar soporte a estas actividades, se utilizará el equipo técnico que se detalla a continuación...").
-    *   **Consistencia Terminológica:** Unifica la terminología. Si en un apartado se habla de "Development Team" y en otro de "Equipo de Desarrollo", elige el término más adecuado (preferiblemente en español) y úsalo de forma consistente en todo el documento.
-    *   **REFERENCIAS CRUZADAS (REQUISITO CLAVE):** Tu principal valor es conectar las ideas a lo largo del documento. Identifica activamente oportunidades para referenciar información ya mencionada. Si en el apartado 5 se retoma un concepto del apartado 1, debes indicarlo explícitamente. **Usa frases como: "Como se detalló en el apartado 1.1, la metodología Agile-Scrum...", "Este enfoque mitiga los riesgos identificados previamente en el análisis DAFO (ver apartado 2.3).", o "El equipo responsable de esta tarea es el presentado en la sección de Equipo Adscrito."**
+1.  **AÑADIR REFERENCIAS CRUZADAS (TAREA PRINCIPAL):**
+    *   Lee el documento completo para entender las conexiones.
+    *   Cuando un apartado posterior mencione un concepto, herramienta o equipo ya introducido, AÑADE una referencia explícita.
+    *   **Ejemplos de frases que DEBES AÑADIR:**
+        *   "Para llevar a cabo estas tareas, se utilizará la metodología Agile-Scrum **descrita en el apartado 1.1**."
+        *   "El seguimiento se realizará a través de Jira, **la herramienta seleccionada para la gestión del proyecto (ver sección 1.5)**."
+        *   "Este enfoque mitiga los riesgos **identificados previamente en el análisis DAFO**."
 
-2.  **MEJORAR EL ESTILO Y LA LEGIBILIDAD:**
-    *   **Voz Activa y Directa:** Transforma frases pasivas en activas para dar más fuerza al texto.
-    *   **Claridad y Concisión:** Elimina redundancias, jerga innecesaria y frases de relleno.
-    *   **Formato y Estilo:** Asegúrate de que todos los títulos y subtítulos sigan un formato consistente de "Sentence case" (solo la primera letra del título en mayúscula, a menos que sea un nombre propio). Ej: "Diagrama de flujo del proceso" en lugar de "Diagrama de Flujo del Proceso".
+2.  **MEJORAR TRANSICIONES:**
+    *   Añade frases o párrafos cortos al inicio de los apartados para crear un puente lógico con el anterior.
+    *   **Ejemplos de transiciones a AÑADIR:**
+        *   (Al inicio del Plan de Trabajo): "**Una vez definida la metodología, el siguiente paso es detallar el plan de trabajo...**"
+        *   (Al inicio del Equipo): "**Para ejecutar el plan de trabajo descrito, se ha conformado el siguiente equipo multidisciplinar...**"
 
-3.  **REGLAS DE EXCLUSIÓN (LO QUE NO DEBES HACER):**
-    *   **No Alterar Datos Clave:** No cambies datos técnicos, nombres de herramientas, cifras, duraciones de Sprints o cualquier información factual del borrador original. Tu trabajo es de estilo y cohesión, no de contenido.
-    *   **No Añadir Nueva Información:** No inventes nuevas funcionalidades o fases que no estuvieran en el texto original.
-    *   **No Incluir Meta-Comentarios:** Tu salida debe ser ÚNICAMENTE el texto final y pulido en formato Markdown. No expliques los cambios que has hecho.
+3.  **UNIFICAR TERMINOLOGÍA:**
+    *   Detecta inconsistencias (ej: "stakeholders" y "partes interesadas") y unifica al término más apropiado y profesional (preferiblemente en español).
 
-El objetivo final es que el documento se lea como si hubiera sido escrito por una única persona experta, con una narrativa fluida y un argumento comercial sólido y cohesionado de principio a fin.
+4.  **REGLA DE ORO INVIOLABLE: NO ELIMINAR CONTENIDO.**
+    *   Está **ESTRICTAMENTE PROHIBIDO** eliminar párrafos, listas o datos del borrador original. Tu trabajo es **AÑADIR** cohesión, no resumir ni reescribir.
+    *   La versión final que generes debe tener una longitud igual o LIGERAMENTE SUPERIOR al texto original, debido a las frases de conexión que añadas.
+
+Genera únicamente el texto completo y mejorado en formato Markdown. No incluyas comentarios sobre los cambios.
 """
 # =============================================================================
 #              NUEVAS FUNCIONES: AUTENTICACIÓN Y GOOGLE DRIVE
@@ -1846,94 +1853,98 @@ def phase_4_page(model):
 # =============================================================================
 #           FASE 5 - VERSIÓN FINAL SEGURA Y CON ÍNDICE
 # =============================================================================
+# =============================================================================
+#           FASE 5 - VERSIÓN DEFINITIVA CON COHESIÓN SEGURA
+# =============================================================================
 
 def phase_5_page(model):
     """
-    Fase final que ensambla el documento definitivo:
-    1. Crea un Índice automático.
-    2. Genera una Introducción estratégica.
-    3. Añade el cuerpo completo del borrador de la Fase 4 sin modificarlo.
+    Fase final que aplica cohesión de forma segura y ensambla el documento definitivo.
+    1. Genera una Introducción.
+    2. Ensambla un borrador interno (Intro + Cuerpo Fase 4).
+    3. Envía ese borrador a la IA para que AÑADA cohesión y referencias.
+    4. Crea un Índice automático y lo añade al documento final.
     """
-    st.markdown("<h3>FASE 5: Ensamblaje del Documento Final</h3>", unsafe_allow_html=True)
-    st.markdown("Este es el último paso. El asistente ensamblará la versión final y definitiva de tu memoria técnica.")
-    st.info("El proceso tomará el borrador de la Fase 4, le añadirá un índice y una nueva introducción estratégica.")
+    st.markdown("<h3>FASE 5: Cohesión y Ensamblaje Final</h3>", unsafe_allow_html=True)
+    st.markdown("Este es el último paso. El asistente realizará un refinamiento inteligente para dar cohesión a todo el documento y añadirá un índice profesional.")
+    st.info("El proceso consta de dos llamadas a la IA y puede tardar varios minutos.")
     st.markdown("---")
 
-    # Comprobación de que existen los datos necesarios de fases anteriores
+    # Comprobaciones iniciales
     if not st.session_state.get("generated_doc_buffer"):
-        st.warning("No se ha encontrado un borrador de la Fase 4. Por favor, completa la fase anterior primero.")
+        st.warning("No se ha encontrado un borrador de la Fase 4. Por favor, completa la fase anterior.")
         if st.button("← Ir a Fase 4"): go_to_phase4(); st.rerun()
         return
-        
     if not st.session_state.get("generated_structure"):
         st.warning("No se ha encontrado la estructura del proyecto. Vuelve a la Fase 1.")
         if st.button("← Ir a Fase 1"): go_to_phase1(); st.rerun()
         return
 
-    if st.button("🚀 Ensamblar Documento Final con Índice e Introducción", type="primary", use_container_width=True):
-        
+    if st.button("🚀 Iniciar Cohesión y Ensamblaje Final", type="primary", use_container_width=True):
         try:
-            with st.spinner("Ensamblando la versión definitiva..."):
-                # --- PIEZA 1: EL CUERPO DEL DOCUMENTO (DE LA FASE 4) ---
-                # Leemos el borrador de la Fase 4 para tener su contenido
+            # --- PASO 1: PREPARACIÓN DEL BORRADOR PARA REFINAMIENTO ---
+            with st.spinner("Paso 1/3: Preparando borrador para el editor IA..."):
+                # Extraer texto del cuerpo de la Fase 4
                 buffer_fase4 = st.session_state.generated_doc_buffer
                 buffer_fase4.seek(0)
                 documento_fase4 = docx.Document(buffer_fase4)
-                
-                # Extraemos el texto completo para que la IA genere la introducción
-                texto_completo_original = "\n".join([p.text for p in documento_fase4.paragraphs if p.text.strip()])
+                texto_cuerpo_fase4 = "\n".join([p.text for p in documento_fase4.paragraphs if p.text.strip()])
 
-                # --- PIEZA 2: LA INTRODUCCIÓN (GENERADA POR IA) ---
-                st.toast("Generando introducción estratégica...")
-                response_intro = model.generate_content([PROMPT_GENERAR_INTRODUCCION, texto_completo_original])
+                # Generar Introducción
+                response_intro = model.generate_content([PROMPT_GENERAR_INTRODUCCION, texto_cuerpo_fase4])
                 introduccion_markdown = limpiar_respuesta_final(response_intro.text)
+                st.toast("Introducción estratégica generada.")
 
-                # --- ENSAMBLAJE FINAL ---
+                # Unir Intro y Cuerpo para formar el borrador completo de refinamiento
+                texto_completo_para_refinar = f"# Introducción\n{introduccion_markdown}\n\n{texto_cuerpo_fase4}"
+
+            # --- PASO 2: APLICAR COHESIÓN CON IA ---
+            with st.spinner("Paso 2/3: El editor IA está añadiendo referencias y cohesión..."):
+                response_cohesion = model.generate_content([PROMPT_COHESION_FINAL, texto_completo_para_refinar])
+                texto_final_refinado_md = limpiar_respuesta_final(response_cohesion.text)
+                st.toast("Cohesión aplicada al documento.")
+
+            # --- PASO 3: ENSAMBLAJE FINAL DEL DOCUMENTO WORD ---
+            with st.spinner("Paso 3/3: Ensamblando la versión definitiva..."):
                 documento_final = docx.Document()
-                
+
                 # 1. Añadir el ÍNDICE
                 estructura_memoria = st.session_state.generated_structure.get('estructura_memoria', [])
                 generar_indice_word(documento_final, estructura_memoria)
                 documento_final.add_page_break()
                 
-                # 2. Añadir la INTRODUCCIÓN
-                documento_final.add_heading("Introducción", level=1)
-                agregar_markdown_a_word(documento_final, corregir_numeracion_markdown(introduccion_markdown))
-                documento_final.add_page_break()
-                
-                # 3. Añadir el CUERPO del documento de la Fase 4
-                st.toast("Añadiendo cuerpo del documento...")
-                # Copiamos cada elemento del borrador original al documento final
-                for element in documento_fase4.element.body:
-                    documento_final.element.body.append(element)
+                # 2. Añadir el CUERPO COMPLETO Y REFINADO (Intro + Resto)
+                # La IA ya nos ha devuelto el texto completo con la intro y los títulos
+                texto_final_corregido = corregir_numeracion_markdown(texto_final_refinado_md)
+                agregar_markdown_a_word(documento_final, texto_final_corregido)
 
                 # --- GUARDADO Y DESCARGA ---
                 doc_io_final = io.BytesIO()
                 documento_final.save(doc_io_final)
                 doc_io_final.seek(0)
-
                 st.session_state.refined_doc_buffer = doc_io_final
                 original_filename = st.session_state.generated_doc_filename
-                st.session_state.refined_doc_filename = original_filename.replace("_Borrador.docx", "_Definitivo_Con_Indice.docx")
+                st.session_state.refined_doc_filename = original_filename.replace("_Borrador.docx", "_Definitivo_Cohesionado.docx")
                 
-                st.success("¡Documento final ensamblado con éxito!")
+                st.success("¡Documento final cohesionado y ensamblado!")
                 st.rerun()
 
         except Exception as e:
             st.error(f"Ocurrió un error crítico durante el ensamblaje final: {e}")
 
-    # Lógica de descarga (usando .get para seguridad)
+    # Lógica de descarga
     if st.session_state.get("refined_doc_buffer"):
         st.balloons()
         st.success("¡Tu memoria técnica definitiva está lista!")
         st.download_button(
-            label="🏆 Descargar Versión Definitiva (.docx)",
+            label="🏆 Descargar Versión Definitiva Cohesionada (.docx)",
             data=st.session_state.refined_doc_buffer,
             file_name=st.session_state.refined_doc_filename,
             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             use_container_width=True
         )
 
+    # Navegación
     st.markdown("---")
     col_nav1, col_nav2 = st.columns(2)
     with col_nav1:
