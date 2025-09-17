@@ -818,38 +818,43 @@ def wrap_html_fragment(html_fragment):
     """
     return full_html_template
 
-# =============================================================================
-#           FUNCIÓN CORRECTA PARA CONVERTIR HTML A IMAGEN EN MEMORIA
-# =============================================================================
-
-def html_a_imagen(html_string):
+def html_a_imagen(html_string, output_filename="temp_image.png"):
     """
-    Convierte una cadena de HTML en datos de imagen PNG (bytes), sin guardar archivos.
-    Devuelve los bytes de la imagen o None si falla.
+    Convierte una cadena de HTML en una imagen PNG, encontrando automáticamente
+    el ejecutable wkhtmltoimage en el entorno de Streamlit Cloud.
     """
     try:
+        # En Streamlit Cloud, el ejecutable se instala en una ruta accesible.
+        # 'which' es un comando de Linux para encontrar la ruta de un programa.
         path_wkhtmltoimage = os.popen('which wkhtmltoimage').read().strip()
 
         if not path_wkhtmltoimage:
             st.error("❌ El ejecutable 'wkhtmltoimage' no se encontró. Asegúrate de que 'wkhtmltopdf' está en tu packages.txt y que la app ha sido reiniciada.")
             return None
 
+        # Crea una configuración para imgkit apuntando al ejecutable encontrado.
         config = imgkit.config(wkhtmltoimage=path_wkhtmltoimage)
+        
+        # Opciones para mejorar la calidad y el tamaño de la imagen
         options = {
             'format': 'png',
             'encoding': "UTF-8",
-            'width': '800',
-            'quiet': '',
-            'enable-local-file-access': None
+            'width': '800',  # Un ancho fijo para consistencia
+            'quiet': ''      # Suprime la salida de la consola
         }
 
-        # Genera la imagen directamente a una variable (bytes), sin crear archivo
-        image_bytes = imgkit.from_string(html_string, False, config=config, options=options)
+        # Genera la imagen desde la cadena de HTML
+        imgkit.from_string(html_string, output_filename, config=config, options=options)
         
-        return image_bytes
+        if os.path.exists(output_filename):
+            return output_filename
+        else:
+            st.warning(f"imgkit ejecutado pero el archivo '{output_filename}' no fue creado.")
+            return None
 
     except Exception as e:
         st.error(f"Ocurrió un error al convertir HTML a imagen: {e}")
+        st.code(f"Path de wkhtmltoimage intentado: {os.popen('which wkhtmltoimage').read().strip()}", language="bash")
         return None
 # AÑADE ESTA NUEVA FUNCIÓN A TU SCRIPT
 def limpiar_respuesta_narrativa(texto_ia):
@@ -959,7 +964,7 @@ def go_to_phase1_results(): st.session_state.page = 'phase_1_results'
 def go_to_phase2(): st.session_state.page = 'phase_2'
 def go_to_phase3(): st.session_state.page = 'phase_3'
 def go_to_phase4(): st.session_state.page = 'phase_4'
-
+def go_to_phase5(): st.session_state.page = 'phase_5'
 
 # --- Función de Limpieza ---
 def back_to_project_selection_and_cleanup():
@@ -1728,25 +1733,13 @@ import imgkit # Y esta también
 #           FASE 4 - VERSIÓN FINAL PARA GENERAR EL CUERPO DEL DOCUMENTO
 # =============================================================================
 
-# =============================================================================
-#           FASE 4 - VERSIÓN FINAL UNIFICADA: GENERACIÓN Y ENSAMBLAJE
-# =============================================================================
-# REEMPLAZA TU phase_4_page COMPLETA CON ESTA VERSIÓN
-
 def phase_4_page(model):
-    """
-    Fase final unificada. Con un solo clic, se genera el documento completo:
-    1. Redacta el cuerpo principal del documento.
-    2. Genera una introducción estratégica basada en el cuerpo redactado.
-    3. Crea un índice automático basado en la estructura.
-    4. Ensambla todo en un único documento Word final.
-    """
-    st.markdown("<h3>FASE 4: Generación del Documento Final</h3>", unsafe_allow_html=True)
-    st.markdown("Este es el último paso. El asistente redactará todo el contenido, generará un índice y una introducción, y ensamblará el documento definitivo listo para descargar.")
-    st.info("Este proceso es completo y puede tardar varios minutos.")
+    """Página para ejecutar el plan de prompts y generar el cuerpo principal del documento Word."""
+    st.markdown("<h3>FASE 4: Redacción del Cuerpo del Documento</h3>", unsafe_allow_html=True)
+    st.markdown("Ejecuta el plan de prompts para generar el contenido completo de la memoria técnica. Este será el cuerpo principal del documento final.")
     st.markdown("---")
 
-    # --- Comprobaciones iniciales ---
+    # --- Setup inicial ---
     service = st.session_state.drive_service
     project_folder_id = st.session_state.selected_project['id']
     docs_app_folder_id = find_or_create_folder(service, "Documentos aplicación", parent_id=project_folder_id)
@@ -1756,35 +1749,28 @@ def phase_4_page(model):
         st.warning("No se ha encontrado un 'plan_de_prompts_conjunto.json'. Vuelve a la Fase 3 para generarlo.")
         if st.button("← Ir a Fase 3"): go_to_phase3(); st.rerun()
         return
-    if not st.session_state.get("generated_structure"):
-        st.warning("No se ha encontrado la estructura del proyecto. Vuelve a la Fase 1.")
-        if st.button("← Ir a Fase 1"): go_to_phase1(); st.rerun()
-        return
 
     try:
         json_bytes = download_file_from_drive(service, plan_conjunto_id).getvalue()
         plan_de_accion = json.loads(json_bytes.decode('utf-8'))
         lista_de_prompts = plan_de_accion.get("plan_de_prompts", [])
         lista_de_prompts.sort(key=lambda x: x.get('prompt_id', ''))
-        st.success(f"✔️ Plan de acción cargado. Se procesarán {len(lista_de_prompts)} tareas para crear el documento final.")
+        st.success(f"✔️ Plan de acción cargado. Se ejecutarán {len(lista_de_prompts)} prompts para crear el cuerpo del documento.")
     except Exception as e:
         st.error(f"Error al cargar o procesar el plan de acción: {e}"); return
 
-    # --- Lógica del botón de generación principal ---
-    button_text = "🔁 Volver a Generar Documento Final" if st.session_state.get("generated_doc_buffer") else "🚀 Generar Documento Final Completo"
+    # --- Lógica del botón de generación ---
+    button_text = "🔁 Volver a Generar Cuerpo del Documento" if st.session_state.get("generated_doc_buffer") else "🚀 Iniciar Redacción y Generar Cuerpo"
     if st.button(button_text, type="primary", use_container_width=True):
         if not lista_de_prompts:
             st.warning("El plan de acción está vacío."); return
 
+        generation_successful = False
+        documento = docx.Document()
         try:
-            cuerpo_documento = docx.Document()
-            texto_completo_generado = ""
-
-            # --- PASO 1: GENERAR EL CUERPO DEL DOCUMENTO ---
-            with st.spinner("Paso 1/3: Redactando el cuerpo del documento..."):
+            with st.spinner("Iniciando redacción... Esto puede tardar varios minutos."):
                 chat_redaccion = model.start_chat()
-                progress_bar = st.progress(0, text="Iniciando redacción...")
-                
+                progress_bar = st.progress(0, text="Configurando sesión de chat...")
                 ultimo_apartado_escrito = None
                 ultimo_subapartado_escrito = None
                 for i, tarea in enumerate(lista_de_prompts):
@@ -1793,12 +1779,12 @@ def phase_4_page(model):
                     apartado_actual = tarea.get("apartado_referencia")
                     subapartado_actual = tarea.get("subapartado_referencia")
                     if apartado_actual and apartado_actual != ultimo_apartado_escrito:
-                        if ultimo_apartado_escrito is not None: cuerpo_documento.add_page_break()
-                        cuerpo_documento.add_heading(apartado_actual, level=1)
+                        if ultimo_apartado_escrito is not None: documento.add_page_break()
+                        documento.add_heading(apartado_actual, level=1)
                         ultimo_apartado_escrito = apartado_actual
                         ultimo_subapartado_escrito = None
                     if subapartado_actual and subapartado_actual != ultimo_subapartado_escrito:
-                        cuerpo_documento.add_heading(subapartado_actual, level=2)
+                        documento.add_heading(subapartado_actual, level=2)
                         ultimo_subapartado_escrito = subapartado_actual
                     respuesta_ia_bruta = ""
                     prompt_actual = tarea.get("prompt_para_asistente")
@@ -1815,64 +1801,42 @@ def phase_4_page(model):
                             texto_limpio = limpiar_respuesta_final(texto_narrativo_completo)
                             texto_corregido = corregir_numeracion_markdown(texto_limpio)
                             if texto_corregido:
-                                agregar_markdown_a_word(cuerpo_documento, texto_corregido)
-                            
-                            # ---- INICIO DE LA CORRECCIÓN CLAVE ----
-                            image_bytes = html_a_imagen(wrap_html_fragment(html_puro))
-                            if image_bytes:
-                                image_stream = io.BytesIO(image_bytes)
-                                cuerpo_documento.add_picture(image_stream, width=docx.shared.Inches(6.5))
+                                agregar_markdown_a_word(documento, texto_corregido)
+                            image_file = html_a_imagen(wrap_html_fragment(html_puro), f"temp_img_{i}.png")
+                            if image_file and os.path.exists(image_file):
+                                documento.add_picture(image_file, width=docx.shared.Inches(6.5))
+                                os.remove(image_file)
                             else:
-                                cuerpo_documento.add_paragraph("[ERROR AL GENERAR IMAGEN DESDE HTML]")
-                            # ---- FIN DE LA CORRECCIÓN CLAVE ----
+                                documento.add_paragraph("[ERROR AL GENERAR IMAGEN DESDE HTML]")
                         else:
                             texto_limpio = limpiar_respuesta_final(respuesta_ia_bruta)
                             texto_corregido = corregir_numeracion_markdown(texto_limpio)
                             if texto_corregido:
-                                agregar_markdown_a_word(cuerpo_documento, texto_corregido)
-                st.toast("Cuerpo del documento redactado con éxito.")
-                texto_completo_generado = "\n".join([p.text for p in cuerpo_documento.paragraphs if p.text.strip()])
-
-            # --- PASO 2: GENERAR LA INTRODUCCIÓN ---
-            with st.spinner("Paso 2/3: Generando introducción estratégica..."):
-                response_intro = model.generate_content([PROMPT_GENERAR_INTRODUCCION, texto_completo_generado])
-                introduccion_markdown = limpiar_respuesta_final(response_intro.text)
-                st.toast("Introducción generada.")
-
-            # --- PASO 3: ENSAMBLAJE FINAL ---
-            with st.spinner("Paso 3/3: Ensamblando el documento final..."):
-                documento_final = docx.Document()
-                estructura_memoria = st.session_state.generated_structure.get('estructura_memoria', [])
-                generar_indice_word(documento_final, estructura_memoria)
-                documento_final.add_page_break()
-                documento_final.add_heading("Introducción", level=1)
-                agregar_markdown_a_word(documento_final, corregir_numeracion_markdown(introduccion_markdown))
-                documento_final.add_page_break()
-                for element in cuerpo_documento.element.body:
-                    documento_final.element.body.append(element)
-                
-                project_name = st.session_state.selected_project['name']
-                safe_project_name = re.sub(r'[\\/*?:"<>|]', "", project_name).replace(' ', '_')
-                nombre_archivo_final = f"Memoria_Tecnica_{safe_project_name}_Completa.docx"
-                doc_io_final = io.BytesIO()
-                documento_final.save(doc_io_final)
-                doc_io_final.seek(0)
-                
-                st.session_state.generated_doc_buffer = doc_io_final
-                st.session_state.generated_doc_filename = nombre_archivo_final
-                
-                st.success("¡Documento final generado y listo para descargar!")
-                st.rerun()
-
+                                agregar_markdown_a_word(documento, texto_corregido)
+                generation_successful = True
         except Exception as e:
-            st.error(f"Ocurrió un error crítico durante la generación: {e}")
+            st.error(f"Ocurrió un error crítico durante la generación del cuerpo del documento: {e}")
+        
+        if generation_successful:
+            project_name = st.session_state.selected_project['name']
+            safe_project_name = re.sub(r'[\\/*?:"<>|]', "", project_name).replace(' ', '_')
+            nombre_archivo_final = f"Cuerpo_Memoria_Tecnica_{safe_project_name}.docx"
+            
+            doc_io = io.BytesIO()
+            documento.save(doc_io)
+            doc_io.seek(0)
+            
+            st.session_state.generated_doc_buffer = doc_io
+            st.session_state.generated_doc_filename = nombre_archivo_final
+            
+            st.success("¡Cuerpo del documento generado con éxito!")
+            st.rerun()
 
     # --- SECCIÓN DE DESCARGA Y NAVEGACIÓN ---
     if st.session_state.get("generated_doc_buffer"):
-        st.balloons()
-        st.success("¡Tu documento final está listo!")
+        st.info("El cuerpo del documento está listo. Ahora puedes descargarlo o pasar a la fase final de ensamblaje.")
         st.download_button(
-            label="🏆 Descargar Documento Final Completo (.docx)",
+            label="📄 Descargar Cuerpo del Documento (.docx)",
             data=st.session_state.generated_doc_buffer,
             file_name=st.session_state.generated_doc_filename,
             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -1884,8 +1848,103 @@ def phase_4_page(model):
     with col_nav1:
         st.button("← Volver a Fase 3 (Plan de Prompts)", on_click=go_to_phase3, use_container_width=True)
     with col_nav2:
-        st.button("↩️ Volver a Selección de Proyecto", on_click=back_to_project_selection_and_cleanup, use_container_width=True)
+        st.button("Ir a Ensamblaje Final (F5) →", on_click=go_to_phase5, use_container_width=True, type="primary", 
+                  disabled=not st.session_state.get("generated_doc_buffer"))
+# =============================================================================
+#           FASE 5 - VERSIÓN FINAL Y SEGURA DE ENSAMBLAJE
+# =============================================================================
 
+def phase_5_page(model):
+    """
+    Fase final y segura que ensambla el documento definitivo:
+    1. Crea un Índice automático.
+    2. Genera una Introducción estratégica basada en el cuerpo del documento.
+    3. Inserta estos dos elementos al principio del borrador intacto de la Fase 4.
+    """
+    st.markdown("<h3>FASE 5: Ensamblaje del Documento Final</h3>", unsafe_allow_html=True)
+    st.markdown("Este es el último paso. El asistente tomará el documento generado en la fase anterior y le añadirá un índice y una introducción profesional para crear la versión definitiva.")
+    st.markdown("---")
+
+    # Comprobaciones iniciales
+    if not st.session_state.get("generated_doc_buffer"):
+        st.warning("No se ha encontrado un documento de la Fase 4 para trabajar. Por favor, completa la fase anterior.")
+        if st.button("← Ir a Fase 4"): go_to_phase4(); st.rerun()
+        return
+    if not st.session_state.get("generated_structure"):
+        st.warning("No se ha encontrado la estructura del proyecto. Vuelve a la Fase 1.")
+        if st.button("← Ir a Fase 1"): go_to_phase1(); st.rerun()
+        return
+
+    if st.button("🚀 Ensamblar Documento Final con Índice e Introducción", type="primary", use_container_width=True):
+        try:
+            with st.spinner("Ensamblando la versión definitiva..."):
+                # --- PREPARACIÓN ---
+                # Leemos el borrador de la Fase 4 para tener su contenido
+                buffer_fase4 = st.session_state.generated_doc_buffer
+                buffer_fase4.seek(0)
+                documento_fase4 = docx.Document(buffer_fase4)
+                
+                # Extraemos el texto completo para que la IA genere la introducción
+                texto_completo_original = "\n".join([p.text for p in documento_fase4.paragraphs if p.text.strip()])
+
+                # --- GENERACIÓN DE PIEZAS NUEVAS ---
+                st.toast("Generando introducción estratégica...")
+                response_intro = model.generate_content([PROMPT_GENERAR_INTRODUCCION, texto_completo_original])
+                introduccion_markdown = limpiar_respuesta_final(response_intro.text)
+
+                # --- ENSAMBLAJE FINAL ---
+                st.toast("Creando documento final...")
+                documento_final = docx.Document()
+                
+                # 1. Añadir el ÍNDICE
+                estructura_memoria = st.session_state.generated_structure.get('estructura_memoria', [])
+                generar_indice_word(documento_final, estructura_memoria)
+                documento_final.add_page_break()
+                
+                # 2. Añadir la INTRODUCCIÓN
+                documento_final.add_heading("Introducción", level=1)
+                agregar_markdown_a_word(documento_final, corregir_numeracion_markdown(introduccion_markdown))
+                documento_final.add_page_break()
+                
+                # 3. Añadir el CUERPO del documento de la Fase 4 SIN TOCARLO
+                # Este bucle copia cada elemento (párrafos, tablas, imágenes) del borrador original al nuevo documento.
+                for element in documento_fase4.element.body:
+                    documento_final.element.body.append(element)
+
+                # --- GUARDADO Y DESCARGA ---
+                doc_io_final = io.BytesIO()
+                documento_final.save(doc_io_final)
+                doc_io_final.seek(0)
+
+                st.session_state.refined_doc_buffer = doc_io_final
+                original_filename = st.session_state.generated_doc_filename
+                st.session_state.refined_doc_filename = original_filename.replace("_Borrador.docx", "_Definitivo.docx")
+                
+                st.success("¡Documento final ensamblado con éxito!")
+                st.rerun()
+
+        except Exception as e:
+            st.error(f"Ocurrió un error crítico durante el ensamblaje final: {e}")
+
+    # Lógica de descarga
+    if st.session_state.get("refined_doc_buffer"):
+        st.balloons()
+        st.success("¡Tu memoria técnica definitiva está lista!")
+        st.download_button(
+            label="🏆 Descargar Versión Definitiva (.docx)",
+            data=st.session_state.refined_doc_buffer,
+            file_name=st.session_state.refined_doc_filename,
+            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            use_container_width=True
+        )
+
+    # Navegación
+    st.markdown("---")
+    col_nav1, col_nav2 = st.columns(2)
+    with col_nav1:
+        st.button("← Volver a Fase 4", on_click=go_to_phase4, use_container_width=True)
+    with col_nav2:
+        st.button("↩️ Volver a Selección de Proyecto", on_click=back_to_project_selection_and_cleanup, use_container_width=True)
 # =============================================================================
 #                        LÓGICA PRINCIPAL (ROUTER)
 # =============================================================================
@@ -1915,4 +1974,5 @@ else:
         phase_3_page(model)
     elif st.session_state.page == 'phase_4':
         phase_4_page(model)
-
+    elif st.session_state.page == 'phase_5': # <-- NUEVA LÍNEA
+        phase_5_page(model)               # <-- NUEVA LÍNEA
