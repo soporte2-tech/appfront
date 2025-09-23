@@ -1956,7 +1956,7 @@ if not credentials:
 else:
     try:
         genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-        model = genai.GenerativeModel('gemini-1.5-pro-latest') 
+        model = genai.GenerativeModel('gemini-2.5-flash') 
     except Exception as e:
         st.error(f"Error al configurar la API de Gemini. Verifica tu 'GEMINI_API_KEY' en los secrets. Detalle: {e}")
         st.stop()
